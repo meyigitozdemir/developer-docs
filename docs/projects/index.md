@@ -1,23 +1,22 @@
+---
+title: All Projects
+description: Explore all development projects, plugins, tools and creative work.
+outline: false
+---
 
 <script setup lang="ts">
+import ProjectsOverview from '../.vitepress/theme/components/ProjectsOverview.vue'
 import ProjectGrid from '../.vitepress/theme/components/ProjectGrid.vue'
 </script>
 
 # All Projects
 
-Welcome to my project collection.
+Discover my development projects, Roblox Studio plugins, tools and creative work.
 
-Explore my work across different platforms,
-including Roblox Studio, Blender, and Godot.
+<ProjectsOverview />
 
-## Explore Platforms
+## Explore the Gallery
 
-- [Roblox Studio](./roblox/)
-- [Blender](./blender/)
-- [Godot](./godot/)
-
-## Project Gallery
-
-Browse all my projects using the search and category filters.
+Use the search bar and filters to find projects by platform, category or development status.
 
 <ProjectGrid />
