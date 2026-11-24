@@ -1,24 +1,14 @@
+---
+title: My First Plugin
+description: An example developer tool for Roblox Studio.
+---
 
-# My First Plugin
+<script setup lang="ts">
+import ProjectDetails from '../../../../.vitepress/theme/components/ProjectDetails.vue'
+</script>
 
-## Overview
+# My First Plugin (Demo)
 
-Describe your project here.
+An example developer tool demonstrating how Roblox Studio projects are organized in Developer Hub.
 
-## Features
-
-- Feature 1
-- Feature 2
-- Feature 3
-
-## Installation
-
-Add installation instructions here.
-
-## User Guide
-
-Explain how to use your project.
-
-## Documentation
-
-Technical documentation will be added here.
+<ProjectDetails slug="my-first-plugin" />

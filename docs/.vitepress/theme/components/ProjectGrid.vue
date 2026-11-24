@@ -4,14 +4,47 @@ import { computed, ref } from 'vue'
 import { withBase } from 'vitepress'
 
 import { projects } from '../../data/projects'
+import type { Project, ProjectStatus } from '../../data/projects'
 import { platforms } from '../../data/platforms'
 
-// ARAMA VE FİLTRE DURUMU
+// =====================================
+// SEARCH AND FILTER STATE
+// =====================================
+
 const searchQuery = ref('')
 const selectedPlatform = ref('all')
 const selectedCategory = ref('all')
+const selectedStatus = ref('all')
 
-// Platform seçenekleri
+// =====================================
+// STATUS CONFIGURATION
+// =====================================
+
+const statusOptions: {
+  value: ProjectStatus
+  label: string
+}[] = [
+  { value: 'in-development', label: 'In Development' },
+  { value: 'released', label: 'Released' },
+  { value: 'archived', label: 'Archived' }
+]
+
+function getStatusLabel(status?: ProjectStatus): string {
+  if (!status) return 'Not Specified'
+
+  return statusOptions.find(
+    option => option.value === status
+  )?.label ?? 'Not Specified'
+}
+
+function getStatusClass(status?: ProjectStatus): string {
+  return status ?? 'unspecified'
+}
+
+// =====================================
+// PLATFORM AND CATEGORY FILTERS
+// =====================================
+
 const platformOptions = computed(() => {
   return platforms.map(platform => ({
     value: platform.slug,
@@ -19,11 +52,9 @@ const platformOptions = computed(() => {
   }))
 })
 
-// Seçili platforma göre kategori seçenekleri
 const categoryOptions = computed(() => {
-  const availableCategories = new Map<string, string>()
+  const result = new Map<string, string>()
 
-  // Platform bilgisinde tanımlı kategoriler
   for (const platform of platforms) {
     if (
       selectedPlatform.value !== 'all' &&
@@ -33,40 +64,43 @@ const categoryOptions = computed(() => {
     }
 
     for (const category of platform.categories) {
-      availableCategories.set(
-        category.slug,
-        category.name
-      )
+      result.set(category.slug, category.name)
     }
   }
 
-  return Array.from(availableCategories, ([value, label]) => ({
+  return Array.from(result, ([value, label]) => ({
     value,
     label
   }))
 })
 
-// Filtrelenmiş projeler
+// =====================================
+// PROJECT FILTERING
+// =====================================
+
 const filteredProjects = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase()
 
   return projects.filter(project => {
-    // Platform kontrolü
     const matchesPlatform =
       selectedPlatform.value === 'all' ||
       project.platform === selectedPlatform.value
 
-    // Kategori kontrolü
     const matchesCategory =
       selectedCategory.value === 'all' ||
       project.category === selectedCategory.value
 
-    // Arama kontrolü
+    const matchesStatus =
+      selectedStatus.value === 'all' ||
+      project.status === selectedStatus.value ||
+      (selectedStatus.value === 'unspecified' && !project.status)
+
     const searchableText = [
       project.title,
       project.description,
       project.platform,
       project.category,
+      project.version ?? '',
       ...(project.tags ?? [])
     ].join(' ').toLocaleLowerCase()
 
@@ -76,32 +110,47 @@ const filteredProjects = computed(() => {
     return (
       matchesPlatform &&
       matchesCategory &&
+      matchesStatus &&
       matchesSearch
     )
   })
 })
 
-// Platform değiştiğinde kategoriyi sıfırla
+const hasActiveFilters = computed(() => {
+  return (
+    searchQuery.value.trim() !== '' ||
+    selectedPlatform.value !== 'all' ||
+    selectedCategory.value !== 'all' ||
+    selectedStatus.value !== 'all'
+  )
+})
+
+// =====================================
+// FILTER ACTIONS
+// =====================================
+
 function selectPlatform(platform: string) {
   selectedPlatform.value = platform
   selectedCategory.value = 'all'
 }
 
-// Tüm filtreleri sıfırla
 function resetFilters() {
   searchQuery.value = ''
   selectedPlatform.value = 'all'
   selectedCategory.value = 'all'
+  selectedStatus.value = 'all'
 }
 
-// Platform adını bul
+// =====================================
+// PROJECT DISPLAY HELPERS
+// =====================================
+
 function getPlatformName(slug: string): string {
   return platforms.find(
     platform => platform.slug === slug
   )?.name ?? slug
 }
 
-// Kategori adını bul
 function getCategoryName(
   platformSlug: string,
   categorySlug: string
@@ -115,7 +164,6 @@ function getCategoryName(
   )?.name ?? categorySlug
 }
 
-// Platforma göre simge
 function getProjectIcon(platform: string): string {
   const icons: Record<string, string> = {
     roblox: '🧩',
@@ -126,28 +174,44 @@ function getProjectIcon(platform: string): string {
   return icons[platform] ?? '📁'
 }
 
-// Proje dokümantasyon bağlantısı
-function getProjectLink(project: typeof projects[number]): string {
-  const defaultPath =
+function getProjectLink(project: Project): string {
+  return withBase(
     `/projects/${project.platform}/${project.category}/${project.slug}/`
+  )
+}
 
-  const link =
-    typeof project.docs === 'string' && project.docs.length > 0
-      ? project.docs
-      : defaultPath
+function getDocumentationLink(project: Project): string | undefined {
+  if (!project.docs?.length) return undefined
 
-  if (/^https?:\/\//i.test(link)) {
-    return link
+  const firstPage = project.docs[0]
+
+  return withBase(
+    `/projects/${project.platform}/${project.category}/${project.slug}/${firstPage.slug}`
+  )
+}
+
+function formatReleaseDate(date?: string): string | undefined {
+  if (!date) return undefined
+
+  const parsedDate = new Date(`${date}T00:00:00Z`)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date
   }
 
-  return withBase(link)
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(parsedDate)
 }
 </script>
 
 <template>
   <div class="project-gallery">
 
-    <!-- ARAMA ALANI -->
+    <!-- SEARCH -->
     <div class="search-wrapper">
       <label for="project-search" class="search-label">
         Search Projects
@@ -160,13 +224,13 @@ function getProjectLink(project: typeof projects[number]): string {
           id="project-search"
           v-model="searchQuery"
           type="search"
-          placeholder="Search by name, description or tags..."
+          placeholder="Search projects by name, description or tags..."
           autocomplete="off"
         />
       </div>
     </div>
 
-    <!-- PLATFORM FİLTRELERİ -->
+    <!-- PLATFORM FILTERS -->
     <div class="filter-section">
       <h3>Platforms</h3>
 
@@ -195,7 +259,7 @@ function getProjectLink(project: typeof projects[number]): string {
       </div>
     </div>
 
-    <!-- KATEGORİ FİLTRELERİ -->
+    <!-- CATEGORY FILTERS -->
     <div v-if="categoryOptions.length > 0" class="filter-section">
       <h3>Categories</h3>
 
@@ -224,7 +288,46 @@ function getProjectLink(project: typeof projects[number]): string {
       </div>
     </div>
 
-    <!-- SONUÇ SAYISI -->
+    <!-- STATUS FILTERS -->
+    <div class="filter-section">
+      <h3>Project Status</h3>
+
+      <div class="filter-buttons">
+        <button
+          type="button"
+          class="filter-button"
+          :class="{ active: selectedStatus === 'all' }"
+          :aria-pressed="selectedStatus === 'all'"
+          @click="selectedStatus = 'all'"
+        >
+          All Statuses
+        </button>
+
+        <button
+          v-for="status in statusOptions"
+          :key="status.value"
+          type="button"
+          class="filter-button"
+          :class="{ active: selectedStatus === status.value }"
+          :aria-pressed="selectedStatus === status.value"
+          @click="selectedStatus = status.value"
+        >
+          {{ status.label }}
+        </button>
+
+        <button
+          type="button"
+          class="filter-button"
+          :class="{ active: selectedStatus === 'unspecified' }"
+          :aria-pressed="selectedStatus === 'unspecified'"
+          @click="selectedStatus = 'unspecified'"
+        >
+          Not Specified
+        </button>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
     <div class="results-header">
       <p aria-live="polite">
         Showing
@@ -235,11 +338,7 @@ function getProjectLink(project: typeof projects[number]): string {
       </p>
 
       <button
-        v-if="
-          searchQuery ||
-          selectedPlatform !== 'all' ||
-          selectedCategory !== 'all'
-        "
+        v-if="hasActiveFilters"
         type="button"
         class="reset-button"
         @click="resetFilters"
@@ -248,35 +347,59 @@ function getProjectLink(project: typeof projects[number]): string {
       </button>
     </div>
 
-    <!-- PROJE KARTLARI -->
+    <!-- PROJECT CARDS -->
     <div v-if="filteredProjects.length > 0" class="projects-grid">
-      <a
+      <article
         v-for="project in filteredProjects"
-        :key="project.slug"
-        :href="getProjectLink(project)"
-        class="project-card hub-card hub-card--interactive"
+        :key="`${project.platform}/${project.category}/${project.slug}`"
+        class="project-card hub-card"
       >
         <div class="project-header">
           <div class="project-icon" aria-hidden="true">
             {{ getProjectIcon(project.platform) }}
           </div>
 
-          <span class="project-arrow" aria-hidden="true">
-            ↗
+          <span
+            class="status-badge"
+            :class="getStatusClass(project.status)"
+          >
+            {{ getStatusLabel(project.status) }}
           </span>
         </div>
 
         <div class="project-content">
           <span class="project-platform">
             {{ getPlatformName(project.platform) }}
+            ·
+            {{ getCategoryName(project.platform, project.category) }}
           </span>
 
-          <h3>{{ project.title }}</h3>
+          <h3>
+            <a :href="getProjectLink(project)" class="project-title-link">
+              {{ project.title }}
+            </a>
+          </h3>
 
           <p>{{ project.description }}</p>
         </div>
 
-        <div v-if="project.tags?.length" class="project-tags">
+        <!-- VERSION AND DATE -->
+        <div class="project-meta">
+          <span class="version-badge">
+            {{ project.version ? `v${project.version.replace(/^v/i, '')}` : 'Version not set' }}
+          </span>
+
+          <time
+            v-if="project.releaseDate"
+            :datetime="project.releaseDate"
+            class="release-date"
+          >
+            {{ formatReleaseDate(project.releaseDate) }}
+          </time>
+        </div>
+
+        <!-- TAGS -->
+        <div v-if="project.tags.length > 0" class="project-tags">
           <span
             v-for="tag in project.tags"
             :key="tag"
@@ -286,19 +409,57 @@ function getProjectLink(project: typeof projects[number]): string {
           </span>
         </div>
 
-        <div class="project-footer">
-          <span class="category-badge">
-            {{ getCategoryName(project.platform, project.category) }}
-          </span>
-
-          <span class="view-project">
+        <!-- ACTION LINKS -->
+        <div class="project-actions">
+          <a
+            :href="getProjectLink(project)"
+            class="project-action primary-action"
+          >
             View Project →
-          </span>
+          </a>
+
+          <a
+            v-if="getDocumentationLink(project)"
+            :href="getDocumentationLink(project)"
+            class="project-action secondary-action"
+          >
+            Docs
+          </a>
+
+          <a
+            v-if="project.links?.github"
+            :href="project.links.github"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="project-action secondary-action"
+          >
+            GitHub ↗
+          </a>
+
+          <a
+            v-if="project.links?.download"
+            :href="project.links.download"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="project-action secondary-action"
+          >
+            Download ↗
+          </a>
+
+          <a
+            v-if="project.links?.website"
+            :href="project.links.website"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="project-action secondary-action"
+          >
+            Website ↗
+          </a>
         </div>
-      </a>
+      </article>
     </div>
 
-    <!-- SONUÇ BULUNAMADI -->
+    <!-- EMPTY STATE -->
     <div v-else class="empty-state">
       <div class="empty-icon" aria-hidden="true">🔎</div>
 
@@ -335,7 +496,6 @@ function getProjectLink(project: typeof projects[number]): string {
 .search-label {
   display: block;
   margin-bottom: 10px;
-  color: var(--vp-c-text-1);
   font-size: 14px;
   font-weight: 600;
 }
@@ -348,7 +508,6 @@ function getProjectLink(project: typeof projects[number]): string {
   border: 1px solid var(--hub-card-border);
   border-radius: var(--hub-radius-sm);
   background: var(--vp-c-bg-soft);
-  transition: border-color 0.2s ease;
 }
 
 .search-field:focus-within {
@@ -362,7 +521,6 @@ function getProjectLink(project: typeof projects[number]): string {
 
 .search-field input {
   width: 100%;
-  min-width: 0;
   height: 48px;
   border: none;
   outline: none;
@@ -403,7 +561,6 @@ function getProjectLink(project: typeof projects[number]): string {
   background: var(--vp-c-bg-soft);
   color: var(--vp-c-text-2);
   font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
   transition: var(--hub-transition);
 }
@@ -420,7 +577,9 @@ function getProjectLink(project: typeof projects[number]): string {
 
 .filter-button:focus-visible,
 .reset-button:focus-visible,
-.empty-reset:focus-visible {
+.empty-reset:focus-visible,
+.project-action:focus-visible,
+.project-title-link:focus-visible {
   outline: 2px solid var(--vp-c-brand-1);
   outline-offset: 3px;
 }
@@ -456,7 +615,7 @@ function getProjectLink(project: typeof projects[number]): string {
   cursor: pointer;
 }
 
-/* PROJECT GRID */
+/* PROJECT CARDS */
 
 .projects-grid {
   display: grid;
@@ -468,49 +627,60 @@ function getProjectLink(project: typeof projects[number]): string {
 .project-card {
   display: flex;
   flex-direction: column;
+  gap: 16px;
   min-width: 0;
   padding: 24px;
   border: 1px solid var(--hub-card-border);
   border-radius: var(--hub-radius);
   background: var(--hub-card-bg);
   box-shadow: var(--hub-card-shadow);
-  color: var(--vp-c-text-1);
-  text-decoration: none;
-  transition: var(--hub-transition);
-}
-
-.project-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--vp-c-brand-1);
-  box-shadow: var(--hub-card-shadow-hover);
-}
-
-.project-card:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 3px;
 }
 
 .project-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 20px;
+  gap: 12px;
 }
 
 .project-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 54px;
-  height: 54px;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
   border-radius: var(--hub-radius-sm);
   background: var(--vp-c-bg);
   font-size: 27px;
 }
 
-.project-arrow {
-  color: var(--vp-c-brand-1);
-  font-size: 21px;
+.status-badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.status-badge.in-development {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+.status-badge.released {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.status-badge.archived {
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+}
+
+.status-badge.unspecified {
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-3);
 }
 
 .project-content {
@@ -525,27 +695,60 @@ function getProjectLink(project: typeof projects[number]): string {
 }
 
 .project-content h3 {
-  margin: 9px 0;
+  margin: 10px 0;
   padding: 0;
   border: none;
-  color: var(--vp-c-text-1);
   font-size: 20px;
   font-weight: 700;
   overflow-wrap: anywhere;
 }
 
+.project-title-link {
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.project-title-link:hover {
+  color: var(--vp-c-brand-1);
+}
+
 .project-content p {
-  margin: 0 0 18px;
+  margin: 0;
   color: var(--vp-c-text-2);
   font-size: 14px;
   line-height: 1.7;
 }
 
+/* VERSION AND DATE */
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.version-badge {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.release-date {
+  color: var(--vp-c-text-3);
+  font-size: 12px;
+}
+
+/* TAGS */
+
 .project-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin-bottom: 18px;
 }
 
 .project-tag {
@@ -556,25 +759,41 @@ function getProjectLink(project: typeof projects[number]): string {
   font-size: 11px;
 }
 
-.project-footer {
+/* ACTION LINKS */
+
+.project-actions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 9px;
   padding-top: 16px;
   border-top: 1px solid var(--vp-c-divider);
 }
 
-.category-badge {
-  color: var(--vp-c-text-2);
-  font-size: 12px;
-}
-
-.view-project {
-  color: var(--vp-c-brand-1);
+.project-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border-radius: var(--hub-radius-sm);
   font-size: 12px;
   font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.project-action:hover {
+  opacity: 0.85;
+}
+
+.primary-action {
+  background: var(--vp-c-brand-1);
+  color: var(--vp-c-bg);
+}
+
+.secondary-action {
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
 }
 
 /* EMPTY STATE */
@@ -628,16 +847,12 @@ function getProjectLink(project: typeof projects[number]): string {
   }
 }
 
-/* ACCESSIBILITY */
+/* REDUCED MOTION */
 
 @media (prefers-reduced-motion: reduce) {
-  .project-card,
-  .filter-button {
+  .filter-button,
+  .project-action {
     transition: none;
-  }
-
-  .project-card:hover {
-    transform: none;
   }
 }
 </style>
