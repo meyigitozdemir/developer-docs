@@ -3,13 +3,16 @@
 import { computed, ref } from 'vue'
 import { socials } from '../../data/socials'
 
+// Seçili sosyal medya kategorisi
 const selectedCategory = ref('All')
 
+// Kategorileri hesap listesinden otomatik oluştur
 const categories = computed(() => [
   'All',
   ...new Set(socials.map(account => account.category))
 ])
 
+// Seçili kategoriye göre hesapları filtrele
 const filteredSocials = computed(() => {
   if (selectedCategory.value === 'All') {
     return socials
@@ -19,23 +22,64 @@ const filteredSocials = computed(() => {
     account => account.category === selectedCategory.value
   )
 })
+
+// Platforma göre simge
+function getPlatformIcon(platform: string): string {
+  const icons: Record<string, string> = {
+    YouTube: '▶',
+    Kick: '📡',
+    Instagram: '📷',
+    GitHub: '💻',
+    Discord: '💬',
+    TikTok: '♪',
+    Twitch: '🎮'
+  }
+
+  return icons[platform] ?? '🌐'
+}
+
+// Platforma göre renk sınıfı
+function getPlatformClass(platform: string): string {
+  const classes: Record<string, string> = {
+    YouTube: 'youtube',
+    Kick: 'kick',
+    Instagram: 'instagram',
+    GitHub: 'github',
+    Discord: 'discord',
+    TikTok: 'tiktok',
+    Twitch: 'twitch'
+  }
+
+  return classes[platform] ?? 'other'
+}
 </script>
 
 <template>
   <div class="social-hub">
-    <div class="social-filters">
+
+    <!-- KATEGORİ FİLTRELERİ -->
+    <div class="social-filters" aria-label="Filter channels">
       <button
         v-for="category in categories"
         :key="category"
         type="button"
         class="filter-button"
         :class="{ active: selectedCategory === category }"
+        :aria-pressed="selectedCategory === category"
         @click="selectedCategory = category"
       >
-        {{ category }}
+        {{ category === 'All' ? 'All Channels' : category }}
+        <span class="filter-count">
+          {{
+            category === 'All'
+              ? socials.length
+              : socials.filter(account => account.category === category).length
+          }}
+        </span>
       </button>
     </div>
 
+    <!-- SOSYAL MEDYA KARTLARI -->
     <div class="social-grid">
       <a
         v-for="account in filteredSocials"
@@ -43,23 +87,14 @@ const filteredSocials = computed(() => {
         :href="account.url"
         target="_blank"
         rel="noopener noreferrer"
-        class="social-card"
+        class="social-card hub-card hub-card--interactive"
       >
-        <div class="social-icon">
-          <svg
-            v-if="account.platform === 'YouTube'"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              fill="currentColor"
-              d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4l6.2 3.6-6.2 3.6Z"
-            />
-          </svg>
-
-          <span v-else>
-            {{ account.platform.charAt(0) }}
-          </span>
+        <div
+          class="social-icon"
+          :class="getPlatformClass(account.platform)"
+          aria-hidden="true"
+        >
+          {{ getPlatformIcon(account.platform) }}
         </div>
 
         <div class="social-info">
@@ -71,9 +106,14 @@ const filteredSocials = computed(() => {
 
           <p>{{ account.description }}</p>
 
-          <span class="visit-link">
-            Visit Channel ↗
+          <span class="social-category">
+            {{ account.category }}
           </span>
+
+          <div class="card-footer">
+            <span>Visit Channel</span>
+            <span aria-hidden="true">↗</span>
+          </div>
         </div>
       </a>
     </div>
@@ -81,41 +121,77 @@ const filteredSocials = computed(() => {
     <p v-if="filteredSocials.length === 0" class="empty-message">
       No accounts found in this category.
     </p>
+
   </div>
 </template>
 
 <style scoped>
 .social-hub {
+  width: 100%;
   margin-top: 24px;
 }
+
+/* KATEGORİ FİLTRELERİ */
 
 .social-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
 }
 
 .filter-button {
-  padding: 8px 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+
   border: 1px solid var(--vp-c-divider);
-  border-radius: 20px;
+  border-radius: 999px;
   background: var(--vp-c-bg-soft);
+
   color: var(--vp-c-text-2);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
+
   cursor: pointer;
-  transition: 0.2s;
+  transition: var(--hub-transition);
 }
 
 .filter-button:hover {
   border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
 }
 
 .filter-button.active {
-  background: var(--vp-c-brand-1);
-  color: white;
   border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
 }
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+
+  border-radius: 999px;
+  background: var(--vp-c-bg);
+
+  color: var(--vp-c-text-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.filter-button:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
+/* KART DÜZENİ */
 
 .social-grid {
   display: grid;
@@ -128,44 +204,96 @@ const filteredSocials = computed(() => {
 
 .social-card {
   display: flex;
+  align-items: flex-start;
   gap: 18px;
+  min-width: 0;
   padding: 24px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 14px;
-  background: var(--vp-c-bg-soft);
+
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius);
+  background: var(--hub-card-bg);
+  box-shadow: var(--hub-card-shadow);
+
   color: var(--vp-c-text-1);
   text-decoration: none;
-  transition: 0.2s;
+
+  transition: var(--hub-transition);
 }
 
 .social-card:hover {
+  transform: translateY(-4px);
   border-color: var(--vp-c-brand-1);
-  transform: translateY(-3px);
+  box-shadow: var(--hub-card-shadow-hover);
 }
+
+.social-card:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
+/* PLATFORM SİMGELERİ */
 
 .social-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+
   width: 52px;
   height: 52px;
-  border-radius: 12px;
-  background: #fee2e2;
-  color: #dc2626;
-}
 
-.social-icon svg {
-  width: 27px;
-  height: 27px;
-}
+  border-radius: var(--hub-radius-sm);
 
-.social-icon span {
   font-size: 25px;
   font-weight: 700;
 }
 
+.youtube {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.kick {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.instagram {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.github {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.discord {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.tiktok {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.twitch {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.other {
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+}
+
+/* KART İÇERİĞİ */
+
 .social-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
 }
 
@@ -176,25 +304,82 @@ const filteredSocials = computed(() => {
 
 .social-info h3 {
   margin: 5px 0;
+  padding: 0;
+  border: none;
+
+  color: var(--vp-c-text-1);
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 650;
+
   overflow-wrap: anywhere;
 }
 
 .social-info p {
+  flex: 1;
   margin: 8px 0 14px;
+
   color: var(--vp-c-text-2);
   font-size: 14px;
   line-height: 1.6;
 }
 
-.visit-link {
+.social-category {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 5px 9px;
+
+  border-radius: 999px;
+  background: var(--vp-c-bg);
+
+  color: var(--vp-c-text-2);
+  font-size: 11px;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 18px;
+  padding-top: 14px;
+
+  border-top: 1px solid var(--vp-c-divider);
   color: var(--vp-c-brand-1);
+
   font-size: 13px;
   font-weight: 600;
 }
 
 .empty-message {
   color: var(--vp-c-text-2);
+}
+
+/* MOBİL UYUMLULUK */
+
+@media (max-width: 640px) {
+  .social-grid {
+    gap: 14px;
+  }
+
+  .social-card {
+    padding: 20px;
+  }
+
+  .social-filters {
+    gap: 8px;
+  }
+}
+
+/* HAREKET HASSASİYETİ */
+
+@media (prefers-reduced-motion: reduce) {
+  .social-card,
+  .filter-button {
+    transition: none;
+  }
+
+  .social-card:hover {
+    transform: none;
+  }
 }
 </style>

@@ -2,83 +2,76 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { withBase } from 'vitepress'
+
 import { projects } from '../../data/projects'
 import { platforms } from '../../data/platforms'
-import type { Project } from '../../data/projects'
 
-// Sayfanın dışarıdan belirlediği filtreler
-const props = defineProps<{
-  platform?: string
-  category?: string
-}>()
-
-// Kullanıcının arama ve filtre seçimleri
+// ARAMA VE FİLTRE DURUMU
 const searchQuery = ref('')
 const selectedPlatform = ref('all')
 const selectedCategory = ref('all')
 
-// Sayfanın kapsamındaki projeler
-const availableProjects = computed(() => {
-  return projects.filter((project) => {
-    const platformMatches =
-      !props.platform ||
-      project.platform === props.platform
-
-    const categoryMatches =
-      !props.category ||
-      project.category === props.category
-
-    return platformMatches && categoryMatches
-  })
-})
-
-// Platform seçeneklerini oluştur
+// Platform seçenekleri
 const platformOptions = computed(() => {
-  return [...new Set(
-    availableProjects.value.map(
-      (project) => project.platform
-    )
-  )]
+  return platforms.map(platform => ({
+    value: platform.slug,
+    label: platform.name
+  }))
 })
 
-// Seçilen platformdaki kategorileri bul
+// Seçili platforma göre kategori seçenekleri
 const categoryOptions = computed(() => {
-  return [...new Set(
-    availableProjects.value
-      .filter((project) =>
-        selectedPlatform.value === 'all' ||
-        project.platform === selectedPlatform.value
+  const availableCategories = new Map<string, string>()
+
+  // Platform bilgisinde tanımlı kategoriler
+  for (const platform of platforms) {
+    if (
+      selectedPlatform.value !== 'all' &&
+      platform.slug !== selectedPlatform.value
+    ) {
+      continue
+    }
+
+    for (const category of platform.categories) {
+      availableCategories.set(
+        category.slug,
+        category.name
       )
-      .map((project) => project.category)
-  )]
+    }
+  }
+
+  return Array.from(availableCategories, ([value, label]) => ({
+    value,
+    label
+  }))
 })
 
-// Arama ve filtreleme
-const visibleProjects = computed(() => {
-  const query = searchQuery.value
-    .trim()
-    .toLowerCase()
+// Filtrelenmiş projeler
+const filteredProjects = computed(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
 
-  return availableProjects.value.filter((project) => {
-
+  return projects.filter(project => {
+    // Platform kontrolü
     const matchesPlatform =
       selectedPlatform.value === 'all' ||
       project.platform === selectedPlatform.value
 
+    // Kategori kontrolü
     const matchesCategory =
       selectedCategory.value === 'all' ||
       project.category === selectedCategory.value
 
+    // Arama kontrolü
     const searchableText = [
       project.title,
       project.description,
       project.platform,
       project.category,
-      ...project.tags
-    ].join(' ').toLowerCase()
+      ...(project.tags ?? [])
+    ].join(' ').toLocaleLowerCase()
 
     const matchesSearch =
-      searchableText.includes(query)
+      query === '' || searchableText.includes(query)
 
     return (
       matchesPlatform &&
@@ -88,484 +81,563 @@ const visibleProjects = computed(() => {
   })
 })
 
-// Platform ismini getir
-function platformLabel(slug: string): string {
+// Platform değiştiğinde kategoriyi sıfırla
+function selectPlatform(platform: string) {
+  selectedPlatform.value = platform
+  selectedCategory.value = 'all'
+}
+
+// Tüm filtreleri sıfırla
+function resetFilters() {
+  searchQuery.value = ''
+  selectedPlatform.value = 'all'
+  selectedCategory.value = 'all'
+}
+
+// Platform adını bul
+function getPlatformName(slug: string): string {
+  return platforms.find(
+    platform => platform.slug === slug
+  )?.name ?? slug
+}
+
+// Kategori adını bul
+function getCategoryName(
+  platformSlug: string,
+  categorySlug: string
+): string {
   const platform = platforms.find(
-    (item) => item.slug === slug
+    item => item.slug === platformSlug
   )
 
-  return platform?.name ?? slug
+  return platform?.categories.find(
+    category => category.slug === categorySlug
+  )?.name ?? categorySlug
 }
 
-// Kategori ismini getir
-function categoryLabel(slug: string): string {
-  return (
-    platforms
-      .flatMap((platform) => platform.categories)
-      .find((category) => category.slug === slug)
-      ?.name ?? slug
-  )
+// Platforma göre simge
+function getProjectIcon(platform: string): string {
+  const icons: Record<string, string> = {
+    roblox: '🧩',
+    blender: '🎨',
+    godot: '🎮'
+  }
+
+  return icons[platform] ?? '📁'
 }
 
-// Proje detay sayfasının adresi
-function projectUrl(project: Project): string {
-  return withBase(
+// Proje dokümantasyon bağlantısı
+function getProjectLink(project: typeof projects[number]): string {
+  const defaultPath =
     `/projects/${project.platform}/${project.category}/${project.slug}/`
-  )
+
+  const link =
+    typeof project.docs === 'string' && project.docs.length > 0
+      ? project.docs
+      : defaultPath
+
+  if (/^https?:\/\//i.test(link)) {
+    return link
+  }
+
+  return withBase(link)
 }
 </script>
 
 <template>
-  <section class="portfolio-section">
+  <div class="project-gallery">
 
-    <!-- ARAMA VE FİLTRE ALANI -->
-    <div class="project-filters">
+    <!-- ARAMA ALANI -->
+    <div class="search-wrapper">
+      <label for="project-search" class="search-label">
+        Search Projects
+      </label>
 
-      <!-- Arama kutusu -->
-      <div class="filter-group search-group">
-        <label for="project-search">
-          Search Projects
-        </label>
+      <div class="search-field">
+        <span class="search-icon" aria-hidden="true">⌕</span>
 
-        <div class="search-wrapper">
-          <span class="search-icon" aria-hidden="true">⌕</span>
-
-          <input
-            id="project-search"
-            v-model="searchQuery"
-            type="search"
-            placeholder="Search projects..."
-            autocomplete="off"
-          />
-        </div>
+        <input
+          id="project-search"
+          v-model="searchQuery"
+          type="search"
+          placeholder="Search by name, description or tags..."
+          autocomplete="off"
+        />
       </div>
+    </div>
 
-      <!-- Platform seçimi -->
-      <div
-        v-if="!props.platform"
-        class="filter-group"
-      >
-        <label for="platform-filter">
-          Platform
-        </label>
+    <!-- PLATFORM FİLTRELERİ -->
+    <div class="filter-section">
+      <h3>Platforms</h3>
 
-        <select
-          id="platform-filter"
-          v-model="selectedPlatform"
-          @change="selectedCategory = 'all'"
+      <div class="filter-buttons">
+        <button
+          type="button"
+          class="filter-button"
+          :class="{ active: selectedPlatform === 'all' }"
+          :aria-pressed="selectedPlatform === 'all'"
+          @click="selectPlatform('all')"
         >
-          <option value="all">
-            All Platforms
-          </option>
+          All Platforms
+        </button>
 
-          <option
-            v-for="platform in platformOptions"
-            :key="platform"
-            :value="platform"
-          >
-            {{ platformLabel(platform) }}
-          </option>
-        </select>
-      </div>
-
-      <!-- Kategori seçimi -->
-      <div
-        v-if="!props.category"
-        class="filter-group"
-      >
-        <label for="category-filter">
-          Category
-        </label>
-
-        <select
-          id="category-filter"
-          v-model="selectedCategory"
+        <button
+          v-for="platform in platformOptions"
+          :key="platform.value"
+          type="button"
+          class="filter-button"
+          :class="{ active: selectedPlatform === platform.value }"
+          :aria-pressed="selectedPlatform === platform.value"
+          @click="selectPlatform(platform.value)"
         >
-          <option value="all">
-            All Categories
-          </option>
-
-          <option
-            v-for="category in categoryOptions"
-            :key="category"
-            :value="category"
-          >
-            {{ categoryLabel(category) }}
-          </option>
-        </select>
+          {{ platform.label }}
+        </button>
       </div>
+    </div>
 
+    <!-- KATEGORİ FİLTRELERİ -->
+    <div v-if="categoryOptions.length > 0" class="filter-section">
+      <h3>Categories</h3>
+
+      <div class="filter-buttons">
+        <button
+          type="button"
+          class="filter-button"
+          :class="{ active: selectedCategory === 'all' }"
+          :aria-pressed="selectedCategory === 'all'"
+          @click="selectedCategory = 'all'"
+        >
+          All Categories
+        </button>
+
+        <button
+          v-for="category in categoryOptions"
+          :key="category.value"
+          type="button"
+          class="filter-button"
+          :class="{ active: selectedCategory === category.value }"
+          :aria-pressed="selectedCategory === category.value"
+          @click="selectedCategory = category.value"
+        >
+          {{ category.label }}
+        </button>
+      </div>
     </div>
 
     <!-- SONUÇ SAYISI -->
     <div class="results-header">
-      <span aria-live="polite">
-        {{ visibleProjects.length }} projects found
-      </span>
+      <p aria-live="polite">
+        Showing
+        <strong>{{ filteredProjects.length }}</strong>
+        of
+        <strong>{{ projects.length }}</strong>
+        projects
+      </p>
+
+      <button
+        v-if="
+          searchQuery ||
+          selectedPlatform !== 'all' ||
+          selectedCategory !== 'all'
+        "
+        type="button"
+        class="reset-button"
+        @click="resetFilters"
+      >
+        Clear Filters
+      </button>
     </div>
 
     <!-- PROJE KARTLARI -->
-    <div class="project-grid">
-
+    <div v-if="filteredProjects.length > 0" class="projects-grid">
       <a
-        v-for="project in visibleProjects"
-        :key="projectUrl(project)"
-        :href="projectUrl(project)"
-        class="project-card"
+        v-for="project in filteredProjects"
+        :key="project.slug"
+        :href="getProjectLink(project)"
+        class="project-card hub-card hub-card--interactive"
       >
-
-        <!-- Proje görseli -->
-        <div class="project-cover">
-
-          <img
-            v-if="project.coverImage"
-            :src="withBase(project.coverImage)"
-            :alt="project.title"
-            loading="lazy"
-          />
-
-          <div v-else class="project-placeholder">
-            <span class="placeholder-symbol">✦</span>
-            <span class="placeholder-text">
-              {{ platformLabel(project.platform) }}
-            </span>
+        <div class="project-header">
+          <div class="project-icon" aria-hidden="true">
+            {{ getProjectIcon(project.platform) }}
           </div>
 
+          <span class="project-arrow" aria-hidden="true">
+            ↗
+          </span>
         </div>
 
-        <!-- Kart bilgileri -->
         <div class="project-content">
-
-          <div class="project-category">
-            {{ platformLabel(project.platform) }}
-            /
-            {{ categoryLabel(project.category) }}
-          </div>
+          <span class="project-platform">
+            {{ getPlatformName(project.platform) }}
+          </span>
 
           <h3>{{ project.title }}</h3>
 
-          <p class="project-description">
-            {{ project.description }}
-          </p>
-
-          <!-- Teknoloji etiketleri -->
-          <div class="project-tags">
-            <span
-              v-for="tag in project.tags"
-              :key="tag"
-              class="project-tag"
-            >
-              {{ tag }}
-            </span>
-          </div>
-
-          <div class="project-action">
-            View Project
-            <span aria-hidden="true">→</span>
-          </div>
-
+          <p>{{ project.description }}</p>
         </div>
 
+        <div v-if="project.tags?.length" class="project-tags">
+          <span
+            v-for="tag in project.tags"
+            :key="tag"
+            class="project-tag"
+          >
+            {{ tag }}
+          </span>
+        </div>
+
+        <div class="project-footer">
+          <span class="category-badge">
+            {{ getCategoryName(project.platform, project.category) }}
+          </span>
+
+          <span class="view-project">
+            View Project →
+          </span>
+        </div>
       </a>
-
     </div>
 
-    <!-- Proje bulunamadı -->
-    <div
-      v-if="visibleProjects.length === 0"
-      class="empty-state"
-    >
-      <div class="empty-icon">⌕</div>
-      <h3>No Projects Found</h3>
+    <!-- SONUÇ BULUNAMADI -->
+    <div v-else class="empty-state">
+      <div class="empty-icon" aria-hidden="true">🔎</div>
+
+      <h3>No projects found</h3>
+
       <p>
-        Try changing your search or selected filters.
+        Try another search term or change the selected filters.
       </p>
+
+      <button
+        type="button"
+        class="empty-reset"
+        @click="resetFilters"
+      >
+        Reset Filters
+      </button>
     </div>
 
-  </section>
+  </div>
 </template>
 
 <style scoped>
-
-/* GENEL ALAN */
-.portfolio-section {
+.project-gallery {
   width: 100%;
-  min-width: 0;
-  margin: 28px 0;
+  margin: 24px 0 48px;
 }
 
-/* FİLTRE DÜZENİ */
-.project-filters {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-  align-items: end;
+/* SEARCH */
 
-  padding: 20px;
-  margin-bottom: 22px;
-
-  background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-}
-
-.filter-group {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.filter-group label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--vp-c-text-2);
-}
-
-/* ARAMA KUTUSU */
 .search-wrapper {
+  margin-bottom: 26px;
+}
+
+.search-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.search-field {
   display: flex;
   align-items: center;
-  width: 100%;
-  min-width: 0;
-  position: relative;
+  gap: 12px;
+  padding: 0 16px;
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius-sm);
+  background: var(--vp-c-bg-soft);
+  transition: border-color 0.2s ease;
+}
+
+.search-field:focus-within {
+  border-color: var(--vp-c-brand-1);
 }
 
 .search-icon {
-  position: absolute;
-  left: 14px;
-  font-size: 23px;
-  line-height: 1;
   color: var(--vp-c-text-3);
-  pointer-events: none;
+  font-size: 25px;
 }
 
-.filter-group input,
-.filter-group select {
-  display: block;
-  box-sizing: border-box;
+.search-field input {
   width: 100%;
   min-width: 0;
-  height: 46px;
-
-  padding: 0 14px;
-
-  background: var(--vp-c-bg);
-  color: var(--vp-c-text-1);
-
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 10px;
-
-  font-family: inherit;
-  font-size: 14px;
-  line-height: normal;
-
+  height: 48px;
+  border: none;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 14px;
 }
 
-.search-wrapper input {
-  padding-left: 44px;
+.search-field input::placeholder {
+  color: var(--vp-c-text-3);
 }
 
-.filter-group input:focus,
-.filter-group select:focus {
+/* FILTERS */
+
+.filter-section {
+  margin-bottom: 22px;
+}
+
+.filter-section h3 {
+  margin: 0 0 12px;
+  padding: 0;
+  border: none;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.filter-button {
+  padding: 9px 14px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--hub-transition);
+}
+
+.filter-button:hover,
+.filter-button.active {
   border-color: var(--vp-c-brand-1);
-  box-shadow: 0 0 0 3px var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
 }
 
-/* SONUÇ SAYISI */
+.filter-button.active {
+  background: var(--vp-c-brand-soft);
+}
+
+.filter-button:focus-visible,
+.reset-button:focus-visible,
+.empty-reset:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
+/* RESULTS */
+
 .results-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 18px;
-
-  font-size: 13px;
-  color: var(--vp-c-text-2);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 28px 0 18px;
 }
 
-/* PROJE KARTLARI */
-.project-grid {
+.results-header p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+}
+
+.results-header strong {
+  color: var(--vp-c-text-1);
+}
+
+.reset-button {
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--vp-c-brand-1);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* PROJECT GRID */
+
+.projects-grid {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(min(100%, 260px), 1fr)
-  );
-  gap: 22px;
+  grid-template-columns:
+    repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px;
 }
 
 .project-card {
   display: flex;
   flex-direction: column;
-
   min-width: 0;
-  overflow: hidden;
-
-  background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-
+  padding: 24px;
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius);
+  background: var(--hub-card-bg);
+  box-shadow: var(--hub-card-shadow);
   color: var(--vp-c-text-1);
   text-decoration: none;
-
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: var(--hub-transition);
 }
 
 .project-card:hover {
   transform: translateY(-4px);
   border-color: var(--vp-c-brand-1);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.10);
-  text-decoration: none;
+  box-shadow: var(--hub-card-shadow-hover);
 }
 
-/* KART GÖRSELİ */
-.project-cover {
-  width: 100%;
-  height: 180px;
-  overflow: hidden;
-
-  background: linear-gradient(
-    135deg,
-    #172554,
-    #4338ca,
-    #6366f1
-  );
+.project-card:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
 }
 
-.project-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.project-placeholder {
+.project-header {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.project-icon {
+  display: flex;
   align-items: center;
   justify-content: center;
-
-  width: 100%;
-  height: 100%;
-  gap: 10px;
+  width: 54px;
+  height: 54px;
+  border-radius: var(--hub-radius-sm);
+  background: var(--vp-c-bg);
+  font-size: 27px;
 }
 
-.placeholder-symbol {
-  font-size: 54px;
-  line-height: 1;
-  color: white;
+.project-arrow {
+  color: var(--vp-c-brand-1);
+  font-size: 21px;
 }
 
-.placeholder-text {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-/* KART İÇERİĞİ */
 .project-content {
-  display: flex;
-  flex-direction: column;
   flex: 1;
-  padding: 22px;
+  min-width: 0;
 }
 
-.project-category {
-  margin-bottom: 10px;
+.project-platform {
   color: var(--vp-c-brand-1);
   font-size: 12px;
   font-weight: 600;
 }
 
 .project-content h3 {
-  margin: 0 0 10px;
+  margin: 9px 0;
   padding: 0;
   border: none;
-  font-size: 19px;
-  line-height: 1.4;
+  color: var(--vp-c-text-1);
+  font-size: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
-.project-description {
+.project-content p {
   margin: 0 0 18px;
   color: var(--vp-c-text-2);
   font-size: 14px;
   line-height: 1.7;
 }
 
-/* ETİKETLER */
 .project-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+  margin-bottom: 18px;
 }
 
 .project-tag {
-  padding: 5px 10px;
-  border-radius: 6px;
-  background: var(--vp-c-default-soft);
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  font-size: 11px;
+}
+
+.project-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.category-badge {
   color: var(--vp-c-text-2);
   font-size: 12px;
 }
 
-/* KART BAĞLANTISI */
-.project-action {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  margin-top: auto;
-  padding-top: 20px;
-
+.view-project {
   color: var(--vp-c-brand-1);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
 }
 
-/* BOŞ SONUÇ */
-.empty-state {
-  padding: 55px 20px;
-  text-align: center;
+/* EMPTY STATE */
 
+.empty-state {
+  padding: 48px 20px;
   border: 1px dashed var(--vp-c-divider);
-  border-radius: 16px;
+  border-radius: var(--hub-radius);
+  text-align: center;
 }
 
 .empty-icon {
-  font-size: 44px;
-  color: var(--vp-c-text-3);
+  font-size: 36px;
 }
 
 .empty-state h3 {
-  margin: 12px 0;
-  font-size: 20px;
+  margin: 12px 0 8px;
+  font-size: 19px;
 }
 
 .empty-state p {
   color: var(--vp-c-text-2);
+  font-size: 14px;
 }
 
-/* TELEFON VE TABLET UYUMLULUĞU */
-@media (max-width: 850px) {
-  .project-filters {
-    grid-template-columns: 1fr;
+.empty-reset {
+  margin-top: 14px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--hub-radius-sm);
+  background: var(--vp-c-brand-1);
+  color: var(--vp-c-bg);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* MOBILE */
+
+@media (max-width: 640px) {
+  .projects-grid {
+    gap: 14px;
   }
 
-  .project-grid {
-    grid-template-columns: repeat(
-      auto-fit,
-      minmax(min(100%, 240px), 1fr)
-    );
+  .project-card {
+    padding: 20px;
+  }
+
+  .filter-buttons {
+    gap: 7px;
   }
 }
+
+/* ACCESSIBILITY */
 
 @media (prefers-reduced-motion: reduce) {
   .project-card,
-  .filter-group input,
-  .filter-group select {
+  .filter-button {
     transition: none;
+  }
+
+  .project-card:hover {
+    transform: none;
   }
 }
 </style>

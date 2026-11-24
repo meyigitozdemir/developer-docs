@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { computed } from 'vue'
 import { withBase } from 'vitepress'
@@ -64,7 +63,7 @@ function getProjectLink(project: {
         v-for="project in featuredProjects"
         :key="project.slug"
         :href="getProjectLink(project)"
-        class="featured-card"
+        class="featured-card hub-card hub-card--interactive"
       >
         <div class="card-header">
           <span class="project-icon" aria-hidden="true">
@@ -149,25 +148,24 @@ function getProjectLink(project: {
   gap: 20px;
 }
 
+
 .featured-card {
   display: flex;
   flex-direction: column;
   padding: 24px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius);
+  background: var(--hub-card-bg);
   color: var(--vp-c-text-1);
   text-decoration: none;
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  box-shadow: var(--hub-card-shadow);
+  transition: var(--hub-transition);
 }
 
 .featured-card:hover {
   transform: translateY(-4px);
   border-color: var(--vp-c-brand-1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--hub-card-shadow-hover);
 }
 
 .card-header {

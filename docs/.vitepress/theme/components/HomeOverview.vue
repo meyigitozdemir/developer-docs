@@ -7,10 +7,10 @@ import { platforms } from '../../data/platforms'
 import { projects } from '../../data/projects'
 import { socials } from '../../data/socials'
 
-// Ana sayfada gösterilecek en fazla sosyal medya hesabı
+// Ana sayfada gösterilecek maksimum sosyal medya hesabı
 const maxSocialAccounts = 4
 
-// Developer Hub istatistikleri
+// Otomatik hesaplanan istatistikler
 const statistics = computed(() => [
   {
     label: 'Projects',
@@ -32,12 +32,12 @@ const statistics = computed(() => [
   }
 ])
 
-// Sosyal medya hesaplarının ilk birkaçını göster
+// Ana sayfada gösterilecek sosyal medya hesapları
 const featuredSocials = computed(() => {
   return socials.slice(0, maxSocialAccounts)
 })
 
-// Platforma göre simge seç
+// Platform simgeleri
 function getSocialIcon(platform: string): string {
   const icons: Record<string, string> = {
     YouTube: '▶',
@@ -50,7 +50,7 @@ function getSocialIcon(platform: string): string {
   return icons[platform] ?? '🌐'
 }
 
-// Platforma göre görsel stil belirle
+// Sosyal medya platformuna göre renk sınıfı
 function getPlatformClass(platform: string): string {
   const classes: Record<string, string> = {
     YouTube: 'youtube',
@@ -81,7 +81,7 @@ function getPlatformClass(platform: string): string {
           v-for="stat in statistics"
           :key="stat.label"
           :href="stat.link"
-          class="stat-card"
+          class="stat-card hub-card hub-card--interactive"
         >
           <div class="stat-icon" aria-hidden="true">
             {{ stat.icon }}
@@ -98,7 +98,7 @@ function getPlatformClass(platform: string): string {
       </div>
     </section>
 
-    <!-- SOSYAL MEDYA -->
+    <!-- SOSYAL MEDYA KARTLARI -->
     <section class="overview-section">
       <div class="section-heading">
         <h2>Connect With Me</h2>
@@ -114,7 +114,7 @@ function getPlatformClass(platform: string): string {
           :href="account.url"
           target="_blank"
           rel="noopener noreferrer"
-          class="social-card"
+          class="social-card hub-card hub-card--interactive"
         >
           <div
             class="social-icon"
@@ -198,20 +198,23 @@ function getPlatformClass(platform: string): string {
   align-items: center;
   gap: 12px;
   padding: 28px 14px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  background: var(--vp-c-bg-soft);
+
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius);
+  background: var(--hub-card-bg);
+  box-shadow: var(--hub-card-shadow);
+
   color: var(--vp-c-text-1);
   text-decoration: none;
   text-align: center;
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease;
+
+  transition: var(--hub-transition);
 }
 
 .stat-card:hover {
   transform: translateY(-4px);
   border-color: var(--vp-c-brand-1);
+  box-shadow: var(--hub-card-shadow-hover);
 }
 
 .stat-icon {
@@ -243,19 +246,22 @@ function getPlatformClass(platform: string): string {
   align-items: flex-start;
   gap: 16px;
   padding: 22px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  background: var(--vp-c-bg-soft);
+
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius);
+  background: var(--hub-card-bg);
+  box-shadow: var(--hub-card-shadow);
+
   color: var(--vp-c-text-1);
   text-decoration: none;
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease;
+
+  transition: var(--hub-transition);
 }
 
 .social-card:hover {
   transform: translateY(-4px);
   border-color: var(--vp-c-brand-1);
+  box-shadow: var(--hub-card-shadow-hover);
 }
 
 .social-icon {
@@ -263,9 +269,11 @@ function getPlatformClass(platform: string): string {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+
   width: 48px;
   height: 48px;
   border-radius: 12px;
+
   font-size: 24px;
   font-weight: 700;
 }
@@ -360,6 +368,20 @@ function getPlatformClass(platform: string): string {
 
   .section-heading h2 {
     font-size: 23px;
+  }
+}
+
+/* HAREKET HASSASİYETİ */
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card,
+  .social-card {
+    transition: none;
+  }
+
+  .stat-card:hover,
+  .social-card:hover {
+    transform: none;
   }
 }
 </style>

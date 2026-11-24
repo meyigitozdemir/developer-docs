@@ -88,3 +88,76 @@
     transform: none;
   }
 }
+
+/* ======================================
+   DEVELOPER HUB — SHARED CARD SYSTEM
+   ====================================== */
+
+/* All reusable card styles */
+.hub-card {
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius);
+  background: var(--hub-card-bg);
+  box-shadow: var(--hub-card-shadow);
+  transition: var(--hub-transition);
+}
+
+/* Interactive cards */
+.hub-card--interactive {
+  cursor: pointer;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.hub-card--interactive:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: var(--hub-card-shadow-hover);
+  transform: translateY(-4px);
+}
+
+/* Standard card title */
+.hub-card__title {
+  margin: 0;
+  padding: 0;
+  border: none;
+  color: var(--vp-c-text-1);
+  font-size: 20px;
+  font-weight: 650;
+}
+
+/* Standard card description */
+.hub-card__description {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Reusable card label */
+.hub-card__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Keyboard accessibility */
+.hub-card--interactive:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .hub-card,
+  .hub-card--interactive {
+    transition: none;
+  }
+
+  .hub-card--interactive:hover {
+    transform: none;
+  }
+}

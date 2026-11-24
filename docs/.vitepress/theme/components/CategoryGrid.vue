@@ -6,19 +6,19 @@ import { withBase } from 'vitepress'
 import { platforms } from '../../data/platforms'
 import { projects } from '../../data/projects'
 
-// Bu bileşen hangi platformu gösterecek?
+// Hangi platformun kategorileri gösterilecek?
 const props = defineProps<{
   platform: string
 }>()
 
-// Seçilen platformu bul
+// Platform bilgilerini bul
 const currentPlatform = computed(() => {
   return platforms.find(
     platform => platform.slug === props.platform
   )
 })
 
-// Her kategori için kart bilgilerini oluştur
+// Kategorileri ve proje sayılarını oluştur
 const categories = computed(() => {
   if (!currentPlatform.value) {
     return []
@@ -43,7 +43,7 @@ const categories = computed(() => {
   })
 })
 
-// Kategorilere ait simgeler
+// Kategori simgeleri
 function getIcon(slug: string): string {
   const icons: Record<string, string> = {
     plugins: '🧩',
@@ -62,7 +62,8 @@ function getDescription(slug: string): string {
     buildings: 'Buildings, structures and environments.'
   }
 
-  return descriptions[slug] ?? 'Explore projects in this category.'
+  return descriptions[slug] ??
+    'Explore projects in this category.'
 }
 </script>
 
@@ -72,16 +73,20 @@ function getDescription(slug: string): string {
       v-for="category in categories"
       :key="category.slug"
       :href="category.link"
-      class="category-card"
+      class="category-card hub-card hub-card--interactive"
     >
       <div class="category-icon" aria-hidden="true">
         {{ getIcon(category.slug) }}
       </div>
 
       <div class="category-content">
-        <h3>{{ category.name }}</h3>
+        <h3 class="category-title">
+          {{ category.name }}
+        </h3>
 
-        <p>{{ getDescription(category.slug) }}</p>
+        <p class="category-description">
+          {{ getDescription(category.slug) }}
+        </p>
 
         <div class="category-footer">
           <span class="project-count">
@@ -117,32 +122,42 @@ function getDescription(slug: string): string {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
   padding: 24px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  background: var(--vp-c-bg-soft);
+
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius);
+  background: var(--hub-card-bg);
+  box-shadow: var(--hub-card-shadow);
+
   color: var(--vp-c-text-1);
   text-decoration: none;
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+
+  transition: var(--hub-transition);
 }
 
 .category-card:hover {
   transform: translateY(-4px);
   border-color: var(--vp-c-brand-1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--hub-card-shadow-hover);
+}
+
+.category-card:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
 }
 
 .category-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+
   width: 56px;
   height: 56px;
-  border-radius: 14px;
+
+  border-radius: var(--hub-radius-sm);
   background: var(--vp-c-bg);
+
   font-size: 28px;
 }
 
@@ -150,19 +165,23 @@ function getDescription(slug: string): string {
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-width: 0;
 }
 
-.category-content h3 {
+.category-title {
   margin: 0;
   padding: 0;
   border: none;
+
+  color: var(--vp-c-text-1);
   font-size: 20px;
   font-weight: 650;
 }
 
-.category-content p {
+.category-description {
   flex: 1;
   margin: 10px 0 20px;
+
   color: var(--vp-c-text-2);
   font-size: 14px;
   line-height: 1.7;
@@ -176,9 +195,13 @@ function getDescription(slug: string): string {
 }
 
 .project-count {
+  display: inline-flex;
+  align-items: center;
   padding: 5px 11px;
-  border-radius: 20px;
+
+  border-radius: 999px;
   background: var(--vp-c-bg);
+
   color: var(--vp-c-text-2);
   font-size: 12px;
   font-weight: 500;
@@ -192,5 +215,25 @@ function getDescription(slug: string): string {
 
 .category-empty {
   color: var(--vp-c-text-2);
+}
+
+@media (max-width: 640px) {
+  .category-grid {
+    gap: 14px;
+  }
+
+  .category-card {
+    padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-card {
+    transition: none;
+  }
+
+  .category-card:hover {
+    transform: none;
+  }
 }
 </style>
