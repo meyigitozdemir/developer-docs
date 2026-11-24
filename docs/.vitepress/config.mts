@@ -1,15 +1,15 @@
-
+﻿
 import { defineConfig } from 'vitepress'
 import { platforms } from './data/platforms.ts'
 import { projects } from './data/projects.ts'
 
-// Üst menüdeki platformlar
+// Ãœst menÃ¼deki platformlar
 const platformMenu = platforms.map((platform) => ({
   text: platform.name,
   link: `/projects/${platform.slug}/`
 }))
 
-// Platform yan menüleri
+// Platform yan menÃ¼leri
 const platformSidebars = Object.fromEntries(
   platforms.map((platform) => [
     `/projects/${platform.slug}/`,
@@ -31,7 +31,7 @@ const platformSidebars = Object.fromEntries(
   ])
 )
 
-// Her projenin kendi dokümantasyon menüsü
+// Her projenin kendi dokÃ¼mantasyon menÃ¼sÃ¼
 const projectSidebars = Object.fromEntries(
   projects.map((project) => {
     const projectPath =
@@ -67,13 +67,14 @@ const projectSidebars = Object.fromEntries(
   })
 )
 
-// Bütün yan menüleri birleştir
+// BÃ¼tÃ¼n yan menÃ¼leri birleÅŸtir
 const sidebars = {
   ...platformSidebars,
   ...projectSidebars
 }
 
 export default defineConfig({
+  base: '/developer-docs/',
   title: 'Developer Hub',
 
   description: 'My projects and documentation',
@@ -95,3 +96,4 @@ export default defineConfig({
     }
   }
 })
+
