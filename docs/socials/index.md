@@ -1,29 +1,17 @@
 ---
-title: Socials & Content
-description: Discover my social media accounts, videos, livestreams and other content.
-aside: false
+title: Socials
+description: Explore my YouTube, Kick and other social media accounts.
+outline: false
 ---
 
-<script setup>
+<script setup lang="ts">
 import SocialGrid from '../.vitepress/theme/components/SocialGrid.vue'
 </script>
 
 # Socials & Content
 
-Welcome to my social media hub!
+Find my videos, livestreams, development updates and community channels.
 
-Here you can find my YouTube channels, livestreams, social media accounts, and other content.
-
-## My Channels
+Explore my accounts by platform or use the search bar to find a specific channel.
 
 <SocialGrid />
-
-## About My Content
-
-I share content across different platforms, including videos, livestreams, and updates.
-
-You can explore my main channels and alternative accounts using the categories above.
-
----
-
-*More channels and platforms will be added over time.*
