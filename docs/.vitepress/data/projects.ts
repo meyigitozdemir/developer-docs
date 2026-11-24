@@ -3,19 +3,22 @@
    DEVELOPER HUB — PROJECT DATA
    ========================================== */
 
-// Projelerin geliştirme durumları
+import { versions } from './versions.ts'
+
+// ==========================================
+// TYPES
+// ==========================================
+
 export type ProjectStatus =
   | 'in-development'
   | 'released'
   | 'archived'
 
-// Projelerin dokümantasyon sayfaları
 export interface DocumentationPage {
   title: string
   slug: string
 }
 
-// Projeye ait harici bağlantılar
 export interface ProjectLinks {
   download?: string
   github?: string
@@ -23,42 +26,76 @@ export interface ProjectLinks {
   website?: string
 }
 
-// Ana proje veri modeli
 export interface Project {
-  // Temel bilgiler
   slug: string
   title: string
   description: string
 
-  // Sınıflandırma
   platform: string
   category: string
   tags: string[]
 
-  // Görsel
   coverImage?: string
-
-  // Dokümantasyon sayfaları
   docs?: DocumentationPage[]
 
-  // Proje yönetim bilgileri
   status?: ProjectStatus
   version?: string
   releaseDate?: string
 
-  // Projeye özel bağlantılar
   links?: ProjectLinks
 }
 
-/* ==========================================
-   PROJECT COLLECTION
-   ========================================== */
+// ==========================================
+// VERSION HELPERS
+// ==========================================
 
-export const projects: Project[] = [
+// Sürüm numarasının başındaki v harfini kaldır
+function normalizeVersion(version: string): string {
+  return version.replace(/^v/i, '')
+}
 
-  // ========================================
+// Numaralı sürümleri karşılaştır
+// Örnek: 1.10.0 > 1.9.0
+function compareVersions(a: string, b: string): number {
+  const first = normalizeVersion(a)
+    .split('.')
+    .map(value => Number.parseInt(value, 10) || 0)
+
+  const second = normalizeVersion(b)
+    .split('.')
+    .map(value => Number.parseInt(value, 10) || 0)
+
+  for (let index = 0; index < 3; index++) {
+    const difference =
+      (second[index] ?? 0) - (first[index] ?? 0)
+
+    if (difference !== 0) {
+      return difference
+    }
+  }
+
+  return 0
+}
+
+// Projeye ait en güncel sürümü bul
+function getLatestRelease(projectSlug: string) {
+  const projectReleases = versions
+    .filter(release => release.projectSlug === projectSlug)
+    .sort((a, b) => compareVersions(a.version, b.version))
+
+  return projectReleases[0]
+}
+
+// ==========================================
+// PROJECT COLLECTION
+// ==========================================
+
+// Projelerin temel bilgileri
+const projectRecords: Project[] = [
+
+  // ----------------------------------------
   // STUDIO HELPER — DEMO
-  // ========================================
+  // ----------------------------------------
   {
     slug: 'studio-helper',
     title: 'Studio Helper (Demo)',
@@ -96,9 +133,9 @@ export const projects: Project[] = [
     ]
   },
 
-  // ========================================
+  // ----------------------------------------
   // MY FIRST PLUGIN — DEMO
-  // ========================================
+  // ----------------------------------------
   {
     slug: 'my-first-plugin',
     title: 'My First Plugin (Demo)',
@@ -116,9 +153,9 @@ export const projects: Project[] = [
     status: 'in-development'
   },
 
-  // ========================================
+  // ----------------------------------------
   // SIGNAL_FASTSETUP
-  // ========================================
+  // ----------------------------------------
   {
     slug: 'signal-fastsetup',
     title: 'Signal_FastSetup',
@@ -138,9 +175,12 @@ export const projects: Project[] = [
       'Developer Tools'
     ],
 
-    status: "released",
-    version: "1.0.0",
-    releaseDate: "2026-11-3",
+    status: 'released',
+
+    links: {
+      download:
+        'https://create.roblox.com/store/asset/95297540676869/FastSignal'
+    },
 
     docs: [
       {
@@ -159,16 +199,30 @@ export const projects: Project[] = [
         title: 'Changelog',
         slug: 'changelog'
       }
-    ],
-
-    // Bağlantılar hazır olduğunda eklenebilir:
-    //
-    links: {
-       download: 'https://create.roblox.com/store/asset/95297540676869/FastSignal',
-    //   github: 'https://...',
-    //   documentation: 'https://...',
-    //   website: 'https://...'
-    },
+    ]
   }
 
 ]
+
+// ==========================================
+// AUTOMATIC VERSION SYNCHRONIZATION
+// ==========================================
+
+// Her projenin en güncel sürüm bilgilerini
+// versions.ts üzerinden otomatik oluştur.
+export const projects: Project[] = projectRecords.map(project => {
+  const latestRelease = getLatestRelease(project.slug)
+
+  if (!latestRelease) {
+    return project
+  }
+
+  return {
+    ...project,
+
+    version: latestRelease.version,
+
+    releaseDate:
+      latestRelease.date ?? project.releaseDate
+  }
+})

@@ -1,26 +1,14 @@
 ---
 title: Changelog
-description: Signal_FastSetup version history.
+description: Version history and release notes for Studio Helper.
 ---
+
+<script setup lang="ts">
+import VersionHistory from '../../../../.vitepress/theme/components/VersionHistory.vue'
+</script>
 
 # Changelog
 
-Development and release history
-for Signal_FastSetup.
+Track updates and release notes for **Studio Helper (Demo)**.
 
-## Documented Features
-
-The current documentation describes:
-
-- Signal import autocomplete
-- The `Seg` shortcut
-- Automatic require statement insertion
-- Automatic Signal module placement
-  in ReplicatedStorage
-
-## Release History
-
-Official version numbers and release
-dates have not been added yet.
-
-Future updates will be recorded here.
+<VersionHistory projectSlug="studio-helper" />
