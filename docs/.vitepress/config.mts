@@ -80,14 +80,26 @@ export default defineConfig({
   description: 'My projects and documentation',
 
   themeConfig: {
+    
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'All Projects', link: '/projects/' },
+      {
+        text: 'Home',
+        link: '/'
+      },
+      {
+        text: 'All Projects',
+        link: '/projects/'
+      },
       {
         text: 'Platforms',
         items: platformMenu
+      },
+      {
+        text: 'Socials',
+        link: '/socials/'
       }
     ],
+
 
     sidebar: sidebars,
 
