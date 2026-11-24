@@ -1,0 +1,19 @@
+
+# Installed dependencies
+node_modules/
+
+# VitePress generated files
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db

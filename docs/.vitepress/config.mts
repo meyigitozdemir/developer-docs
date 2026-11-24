@@ -78,9 +78,6 @@ export default defineConfig({
 
   description: 'My projects and documentation',
 
-  // GitHub Pages için repository yolu
-  base: '/developer-docs/',
-
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
