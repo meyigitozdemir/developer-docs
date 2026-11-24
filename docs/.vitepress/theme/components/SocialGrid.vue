@@ -4,13 +4,9 @@ import { computed, ref } from 'vue'
 import { socials } from '../../data/socials.ts'
 
 // =====================================
-// SEARCH & FILTERS
+// PLATFORM CONFIGURATION
 // =====================================
 
-const searchQuery = ref('')
-const selectedPlatform = ref('all')
-
-// Platformların görünme sırası
 const platformOrder = [
   'YouTube',
   'Kick',
@@ -22,28 +18,179 @@ const platformOrder = [
   'X'
 ]
 
-// Platform listesini otomatik oluştur
+const platformConfig: Record<string, {
+  icon: string
+  symbol: string
+  cssClass: string
+}> = {
+  YouTube: {
+    icon: 'youtube',
+    symbol: '▶',
+    cssClass: 'youtube'
+  },
+  Kick: {
+    icon: 'kick',
+    symbol: 'K',
+    cssClass: 'kick'
+  },
+  Twitch: {
+    icon: 'twitch',
+    symbol: 'T',
+    cssClass: 'twitch'
+  },
+  TikTok: {
+    icon: 'tiktok',
+    symbol: '♪',
+    cssClass: 'tiktok'
+  },
+  Instagram: {
+    icon: 'instagram',
+    symbol: '◎',
+    cssClass: 'instagram'
+  },
+  Discord: {
+    icon: 'discord',
+    symbol: 'D',
+    cssClass: 'discord'
+  },
+  GitHub: {
+    icon: 'github',
+    symbol: 'G',
+    cssClass: 'github'
+  },
+  X: {
+    icon: 'x',
+    symbol: '𝕏',
+    cssClass: 'twitter'
+  }
+}
+
+// =====================================
+// LOCAL PROFILE IMAGES
+// =====================================
+
+// Profil fotoğraflarını otomatik bul.
+// Vite görselleri derleme sırasında işler.
+const avatarFiles = import.meta.glob<string>(
+  '../assets/social-avatars/*.{png,jpg,jpeg,webp}',
+  {
+    eager: true,
+    query: '?url',
+    import: 'default'
+  }
+)
+
+// Dosya adlarını hesap adlarıyla eşleştir.
+const avatarMap: Record<string, string> = {}
+
+for (const [path, url] of Object.entries(avatarFiles)) {
+  const filename = path.split('/').pop() ?? ''
+
+  const key = filename
+    .replace(/\.(png|jpg|jpeg|webp)$/i, '')
+    .toLowerCase()
+
+  avatarMap[key] = url
+}
+
+// Hesap adını dosya adına dönüştür.
+function getAvatarKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+// Hatalı fotoğraflar için yedek görünüm
+const failedAvatars = ref<Record<string, boolean>>({})
+
+function getAvatarUrl(name: string): string | undefined {
+  const key = getAvatarKey(name)
+
+  if (failedAvatars.value[key]) {
+    return undefined
+  }
+
+  return avatarMap[key]
+}
+
+function handleAvatarError(name: string) {
+  failedAvatars.value[getAvatarKey(name)] = true
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+
+  if (parts.length === 0) {
+    return '?'
+  }
+
+  return parts
+    .slice(0, 2)
+    .map(part => part[0].toUpperCase())
+    .join('')
+}
+
+// =====================================
+// PLATFORM ICONS
+// =====================================
+
+const failedIcons = ref<Record<string, boolean>>({})
+
+function getPlatformIcon(platform: string): string | undefined {
+  const config = platformConfig[platform]
+
+  if (!config || failedIcons.value[platform]) {
+    return undefined
+  }
+
+  const color = platform === 'Kick'
+    ? '101010'
+    : 'FFFFFF'
+
+  return `https://cdn.simpleicons.org/${config.icon}/${color}`
+}
+
+function handleIconError(platform: string) {
+  failedIcons.value[platform] = true
+}
+
+function getPlatformSymbol(platform: string): string {
+  return platformConfig[platform]?.symbol ?? '🌐'
+}
+
+function getPlatformClass(platform: string): string {
+  return platformConfig[platform]?.cssClass ?? 'other'
+}
+
+// =====================================
+// SEARCH AND FILTERS
+// =====================================
+
+const searchQuery = ref('')
+const selectedPlatform = ref('all')
+
 const platforms = computed(() => {
-  const names = [...new Set(
+  const result = [...new Set(
     socials.map(account => account.platform)
   )]
 
-  return names.sort((a, b) => {
-    const aIndex = platformOrder.indexOf(a)
-    const bIndex = platformOrder.indexOf(b)
+  return result.sort((a, b) => {
+    const first = platformOrder.indexOf(a)
+    const second = platformOrder.indexOf(b)
 
-    const aRank = aIndex === -1 ? 999 : aIndex
-    const bRank = bIndex === -1 ? 999 : bIndex
+    const firstRank = first === -1 ? 999 : first
+    const secondRank = second === -1 ? 999 : second
 
-    if (aRank !== bRank) return aRank - bRank
-
-    return a.localeCompare(b)
+    return firstRank - secondRank || a.localeCompare(b)
   })
 })
 
-// Arama ve seçili platforma göre filtrele
 const filteredSocials = computed(() => {
-  const query = searchQuery.value.trim().toLocaleLowerCase()
+  const query = searchQuery.value.trim().toLowerCase()
 
   return socials.filter(account => {
     const matchesPlatform =
@@ -51,90 +198,67 @@ const filteredSocials = computed(() => {
       account.platform === selectedPlatform.value
 
     const searchableText = [
-      account.platform,
       account.name,
+      account.platform,
       account.description,
       account.category
-    ].join(' ').toLocaleLowerCase()
+    ].join(' ').toLowerCase()
 
     return (
       matchesPlatform &&
-      (query === '' || searchableText.includes(query))
+      searchableText.includes(query)
     )
   })
 })
 
-// Hesapları platform başlıkları altında grupla
+// Main Channels önce, Alternative Channels sonra.
+function getCategoryOrder(category: string): number {
+  const value = category.toLowerCase()
+
+  if (value.includes('main')) return 0
+  if (value.includes('alternative')) return 1
+
+  return 2
+}
+
 const groupedSocials = computed(() => {
   return platforms.value
     .map(platform => ({
       name: platform,
-      accounts: filteredSocials.value.filter(
-        account => account.platform === platform
-      )
+      accounts: filteredSocials.value
+        .filter(account => account.platform === platform)
+        .sort((a, b) =>
+          getCategoryOrder(a.category) -
+          getCategoryOrder(b.category)
+        )
     }))
     .filter(group => group.accounts.length > 0)
 })
-
-// Filtreleri sıfırla
-function clearFilters() {
-  searchQuery.value = ''
-  selectedPlatform.value = 'all'
-}
-
-// =====================================
-// ICONS & PLATFORM COLORS
-// =====================================
-
-function getPlatformIcon(platform: string): string {
-  const icons: Record<string, string> = {
-    YouTube: '▶',
-    Kick: '📡',
-    Twitch: '🎮',
-    TikTok: '♪',
-    Instagram: '📷',
-    Discord: '💬',
-    GitHub: '⌘',
-    X: '𝕏'
-  }
-
-  return icons[platform] ?? '🌐'
-}
-
-function getPlatformClass(platform: string): string {
-  const classes: Record<string, string> = {
-    YouTube: 'youtube',
-    Kick: 'kick',
-    Twitch: 'twitch',
-    TikTok: 'tiktok',
-    Instagram: 'instagram',
-    Discord: 'discord',
-    GitHub: 'github',
-    X: 'twitter'
-  }
-
-  return classes[platform] ?? 'other'
-}
 
 function getPlatformCount(platform: string): number {
   return socials.filter(
     account => account.platform === platform
   ).length
 }
+
+function resetFilters() {
+  searchQuery.value = ''
+  selectedPlatform.value = 'all'
+}
 </script>
 
 <template>
   <div class="socials-hub">
 
-    <!-- OVERVIEW -->
-    <div class="socials-overview">
-      <div class="overview-stat hub-card">
-        <span class="stat-label">Social Accounts</span>
+    <!-- STATISTICS -->
+    <div class="overview-grid">
+      <div class="overview-card hub-card">
+        <span>Total Accounts</span>
         <strong>{{ socials.length }}</strong>
       </div>
 
-      <div class="overview-stat hub-card">
-        <span class="stat-label">Platforms</span>
+      <div class="overview-card hub-card">
+        <span>Platforms</span>
         <strong>{{ platforms.length }}</strong>
       </div>
     </div>
@@ -145,25 +269,17 @@ function getPlatformCount(platform: string): number {
         Find a Channel
       </label>
 
-      <div class="search-field">
-        <span aria-hidden="true">⌕</span>
-
-        <input
-          id="social-search"
-          v-model="searchQuery"
-          type="search"
-          placeholder="Search channels, platforms or categories..."
-          autocomplete="off"
-        />
-      </div>
+      <input
+        id="social-search"
+        v-model="searchQuery"
+        type="search"
+        placeholder="Search accounts, platforms or categories..."
+        autocomplete="off"
+      />
     </div>
 
-    <!-- PLATFORM FILTERS -->
-    <div
-      class="platform-filters"
-      role="group"
-      aria-label="Filter social media platforms"
-    >
+    <!-- FILTERS -->
+    <div class="platform-filters" role="group" aria-label="Filter platforms">
       <button
         type="button"
         class="filter-button"
@@ -172,9 +288,6 @@ function getPlatformCount(platform: string): number {
         @click="selectedPlatform = 'all'"
       >
         All Platforms
-        <span class="filter-count">
-          {{ socials.length }}
-        </span>
       </button>
 
       <button
@@ -187,7 +300,6 @@ function getPlatformCount(platform: string): number {
         @click="selectedPlatform = platform"
       >
         {{ platform }}
-
         <span class="filter-count">
           {{ getPlatformCount(platform) }}
         </span>
@@ -197,57 +309,56 @@ function getPlatformCount(platform: string): number {
     <!-- RESULTS -->
     <div class="results-bar">
       <span aria-live="polite">
-        Showing
-        <strong>{{ filteredSocials.length }}</strong>
+        Showing {{ filteredSocials.length }}
         of {{ socials.length }} accounts
       </span>
 
       <button
-        v-if="selectedPlatform !== 'all' || searchQuery"
+        v-if="searchQuery || selectedPlatform !== 'all'"
         type="button"
-        class="clear-button"
-        @click="clearFilters"
+        class="reset-button"
+        @click="resetFilters"
       >
         Clear Filters
       </button>
     </div>
 
     <!-- PLATFORM GROUPS -->
-    <div
-      v-if="groupedSocials.length > 0"
-      class="platform-groups"
-    >
+    <div v-if="groupedSocials.length" class="platform-groups">
       <section
         v-for="group in groupedSocials"
         :key="group.name"
         class="platform-section"
       >
-        <div class="platform-header">
-          <div class="platform-title">
-            <span
-              class="platform-icon"
-              :class="getPlatformClass(group.name)"
-              aria-hidden="true"
-            >
-              {{ getPlatformIcon(group.name) }}
+        <div class="platform-heading">
+          <div
+            class="brand-icon"
+            :class="getPlatformClass(group.name)"
+          >
+            <img
+              v-if="getPlatformIcon(group.name)"
+              :src="getPlatformIcon(group.name)"
+              alt=""
+              width="26"
+              height="26"
+              @error="handleIconError(group.name)"
+            />
+
+            <span v-else aria-hidden="true">
+              {{ getPlatformSymbol(group.name) }}
             </span>
+          </div>
 
-            <div class="platform-heading">
-              <h2>{{ group.name }}</h2>
-
-              <p>
-                {{ group.accounts.length }}
-                {{
-                  group.accounts.length === 1
-                    ? 'account'
-                    : 'accounts'
-                }}
-              </p>
-            </div>
+          <div>
+            <h2>{{ group.name }}</h2>
+            <p>
+              {{ group.accounts.length }}
+              {{ group.accounts.length === 1 ? 'account' : 'accounts' }}
+            </p>
           </div>
         </div>
 
-        <!-- ACCOUNTS -->
+        <!-- ACCOUNT CARDS -->
         <div class="account-grid">
           <a
             v-for="account in group.accounts"
@@ -257,31 +368,57 @@ function getPlatformCount(platform: string): number {
             rel="noopener noreferrer"
             class="account-card hub-card hub-card--interactive"
           >
-            <div class="account-top">
-              <span class="account-category">
+            <div
+              class="account-cover"
+              :class="getPlatformClass(group.name)"
+            >
+              <img
+                v-if="getPlatformIcon(group.name)"
+                :src="getPlatformIcon(group.name)"
+                alt=""
+                width="36"
+                height="36"
+                @error="handleIconError(group.name)"
+              />
+
+              <span v-else class="cover-symbol">
+                {{ getPlatformSymbol(group.name) }}
+              </span>
+
+              <span class="cover-category">
                 {{ account.category }}
               </span>
-
-              <span
-                class="external-arrow"
-                aria-hidden="true"
-              >
-                ↗
-              </span>
             </div>
 
-            <div class="account-info">
+            <div class="account-body">
+
+              <!-- REAL AVATAR OR FALLBACK -->
+              <div class="account-avatar">
+                <img
+                  v-if="getAvatarUrl(account.name)"
+                  :src="getAvatarUrl(account.name)"
+                  :alt="`${account.name} profile picture`"
+                  loading="lazy"
+                  @error="handleAvatarError(account.name)"
+                />
+
+                <span v-else>
+                  {{ getInitials(account.name) }}
+                </span>
+              </div>
+
               <h3>{{ account.name }}</h3>
 
-              <p>{{ account.description }}</p>
-            </div>
-
-            <div class="account-footer">
-              <span>Visit Channel</span>
-
-              <span aria-hidden="true">
-                →
+              <span class="account-platform">
+                {{ account.platform }}
               </span>
+
+              <p>{{ account.description }}</p>
+
+              <div class="account-footer">
+                <span>Visit Channel</span>
+                <span aria-hidden="true">↗</span>
+              </div>
             </div>
           </a>
         </div>
@@ -290,20 +427,16 @@ function getPlatformCount(platform: string): number {
 
     <!-- EMPTY STATE -->
     <div v-else class="empty-state">
-      <span class="empty-icon" aria-hidden="true">
-        🔎
-      </span>
-
-      <h3>No channels found</h3>
+      <h3>No Channels Found</h3>
 
       <p>
-        Try another search or choose a different platform.
+        Try another search term or platform.
       </p>
 
       <button
         type="button"
         class="reset-button"
-        @click="clearFilters"
+        @click="resetFilters"
       >
         Show All Channels
       </button>
@@ -318,42 +451,32 @@ function getPlatformCount(platform: string): number {
   margin: 28px 0 48px;
 }
 
-/* OVERVIEW */
-
-.socials-overview {
+.overview-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 34px;
+  margin-bottom: 28px;
 }
 
-.overview-stat {
+.overview-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 24px;
-
-  border: 1px solid var(--hub-card-border);
-  border-radius: var(--hub-radius);
-  background: var(--hub-card-bg);
-  box-shadow: var(--hub-card-shadow);
+  gap: 8px;
+  padding: 22px;
 }
 
-.stat-label {
+.overview-card span {
   color: var(--vp-c-text-2);
   font-size: 13px;
 }
 
-.overview-stat strong {
+.overview-card strong {
   color: var(--vp-c-brand-1);
-  font-size: 34px;
-  line-height: 1.2;
+  font-size: 32px;
 }
 
-/* SEARCH */
-
 .search-section {
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 
 .search-section label {
@@ -363,70 +486,46 @@ function getPlatformCount(platform: string): number {
   font-weight: 600;
 }
 
-.search-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-
+.search-section input {
+  width: 100%;
+  padding: 14px 16px;
   border: 1px solid var(--vp-c-divider);
   border-radius: var(--hub-radius-sm);
   background: var(--vp-c-bg-soft);
-}
-
-.search-field:focus-within {
-  border-color: var(--vp-c-brand-1);
-}
-
-.search-field > span {
-  color: var(--vp-c-text-3);
-  font-size: 25px;
-}
-
-.search-field input {
-  width: 100%;
-  min-width: 0;
-  height: 50px;
-
-  border: none;
-  outline: none;
-  background: transparent;
-
   color: var(--vp-c-text-1);
   font: inherit;
   font-size: 14px;
 }
 
-/* FILTERS */
+.search-section input:focus {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
 
 .platform-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 9px;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .filter-button {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 10px 14px;
-
+  gap: 8px;
+  padding: 9px 14px;
   border: 1px solid var(--vp-c-divider);
   border-radius: 999px;
   background: var(--vp-c-bg-soft);
-
   color: var(--vp-c-text-2);
   font-size: 13px;
   cursor: pointer;
-
-  transition: var(--hub-transition);
 }
 
 .filter-button:hover,
 .filter-button.active {
-  color: var(--vp-c-brand-1);
   border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
 }
 
 .filter-button.active {
@@ -434,37 +533,24 @@ function getPlatformCount(platform: string): number {
 }
 
 .filter-count {
-  min-width: 22px;
-  padding: 3px 6px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: var(--vp-c-bg);
-  color: var(--vp-c-text-2);
   font-size: 11px;
-  text-align: center;
 }
-
-.filter-button:focus-visible,
-.clear-button:focus-visible,
-.reset-button:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 3px;
-}
-
-/* RESULTS */
 
 .results-bar {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 30px;
-
   color: var(--vp-c-text-2);
   font-size: 13px;
 }
 
-.clear-button {
+.reset-button {
   border: none;
   background: transparent;
   color: var(--vp-c-brand-1);
@@ -473,47 +559,43 @@ function getPlatformCount(platform: string): number {
   cursor: pointer;
 }
 
-/* PLATFORM SECTIONS */
-
 .platform-groups {
   display: grid;
   gap: 42px;
 }
 
-.platform-header {
-  margin-bottom: 18px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--vp-c-divider);
-}
-
-.platform-title {
+.platform-heading {
   display: flex;
   align-items: center;
   gap: 14px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--vp-c-divider);
 }
 
-.platform-icon {
+.brand-icon {
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   flex-shrink: 0;
-
   width: 52px;
   height: 52px;
-  border-radius: 14px;
+  border-radius: 13px;
+  font-size: 24px;
+  font-weight: 800;
+}
 
-  font-size: 25px;
-  font-weight: 700;
+.brand-icon img,
+.account-cover > img {
+  display: block;
+  object-fit: contain;
 }
 
 .platform-heading h2 {
   margin: 0;
   padding: 0;
   border: none;
-
-  color: var(--vp-c-text-1);
   font-size: 22px;
-  font-weight: 700;
 }
 
 .platform-heading p {
@@ -522,69 +604,66 @@ function getPlatformCount(platform: string): number {
   font-size: 12px;
 }
 
-/* PLATFORM COLORS */
-
 .youtube {
-  background: #fee2e2;
-  color: #dc2626;
+  background: #ff0033;
+  color: #fff;
 }
 
 .kick {
-  background: #dcfce7;
-  color: #15803d;
+  background: #53fc18;
+  color: #101010;
 }
 
 .twitch {
-  background: #ede9fe;
-  color: #6d28d9;
+  background: #9146ff;
+  color: #fff;
 }
 
-.tiktok,
-.github,
-.twitter {
-  background: #e5e7eb;
-  color: #111827;
+.tiktok {
+  background: #161616;
+  color: #fff;
 }
 
 .instagram {
-  background: #fce7f3;
-  color: #be185d;
+  background: linear-gradient(135deg, #833ab4, #e1306c, #f77737);
+  color: #fff;
 }
 
 .discord {
-  background: #e0e7ff;
-  color: #4338ca;
+  background: #5865f2;
+  color: #fff;
+}
+
+.github {
+  background: #24292f;
+  color: #fff;
+}
+
+.twitter {
+  background: #111;
+  color: #fff;
 }
 
 .other {
-  background: var(--vp-c-bg);
-  color: var(--vp-c-text-1);
+  background: var(--vp-c-brand-2);
+  color: #fff;
 }
-
-/* ACCOUNT CARDS */
 
 .account-grid {
   display: grid;
   grid-template-columns:
-    repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    repeat(auto-fit, minmax(min(100%, 270px), 1fr));
   gap: 18px;
 }
 
 .account-card {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  overflow: hidden;
   min-width: 0;
-  padding: 22px;
-
-  border: 1px solid var(--hub-card-border);
-  border-radius: var(--hub-radius);
-  background: var(--hub-card-bg);
-  box-shadow: var(--hub-card-shadow);
-
+  padding: 0;
   color: var(--vp-c-text-1);
   text-decoration: none;
-  transition: var(--hub-transition);
 }
 
 .account-card:hover {
@@ -593,58 +672,87 @@ function getPlatformCount(platform: string): number {
   box-shadow: var(--hub-card-shadow-hover);
 }
 
-.account-card:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 3px;
-}
-
-.account-top,
-.account-footer {
+.account-cover {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-height: 96px;
+  padding: 22px;
 }
 
-.account-category {
-  display: inline-flex;
-  padding: 6px 10px;
+.cover-symbol {
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.cover-category {
+  padding: 5px 10px;
   border-radius: 999px;
-  background: var(--vp-c-bg);
-  color: var(--vp-c-text-2);
+  background: rgba(255, 255, 255, 0.85);
+  color: #111827;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.external-arrow {
-  color: var(--vp-c-brand-1);
-  font-size: 20px;
-}
-
-.account-info {
+.account-body {
+  display: flex;
   flex: 1;
-  min-width: 0;
+  flex-direction: column;
+  padding: 0 22px 20px;
 }
 
-.account-info h3 {
-  margin: 0 0 10px;
+.account-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  margin-top: -30px;
+  margin-bottom: 12px;
+  border: 4px solid var(--hub-card-bg);
+  border-radius: 50%;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  font-size: 19px;
+  font-weight: 750;
+  position: relative;
+  overflow: hidden;
+}
+
+.account-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-body h3 {
+  margin: 0;
   padding: 0;
   border: none;
-
   color: var(--vp-c-text-1);
   font-size: 20px;
-  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
-.account-info p {
-  margin: 0;
+.account-platform {
+  margin-top: 4px;
+  color: var(--vp-c-text-3);
+  font-size: 12px;
+}
+
+.account-body p {
+  flex: 1;
+  margin: 12px 0 18px;
   color: var(--vp-c-text-2);
   font-size: 14px;
   line-height: 1.7;
 }
 
 .account-footer {
+  display: flex;
+  justify-content: space-between;
   padding-top: 14px;
   border-top: 1px solid var(--vp-c-divider);
   color: var(--vp-c-brand-1);
@@ -652,79 +760,32 @@ function getPlatformCount(platform: string): number {
   font-weight: 600;
 }
 
-/* EMPTY STATE */
-
 .empty-state {
-  padding: 44px 20px;
+  padding: 40px 20px;
   border: 1px dashed var(--vp-c-divider);
   border-radius: var(--hub-radius);
   text-align: center;
 }
 
-.empty-icon {
-  font-size: 32px;
-}
-
-.empty-state h3 {
-  margin: 12px 0 8px;
-  font-size: 18px;
-}
-
 .empty-state p {
   color: var(--vp-c-text-2);
-  font-size: 14px;
 }
-
-.reset-button {
-  margin-top: 16px;
-  padding: 10px 16px;
-  border: 1px solid var(--vp-c-brand-1);
-  border-radius: var(--hub-radius-sm);
-  background: var(--vp-c-brand-soft);
-  color: var(--vp-c-brand-1);
-  cursor: pointer;
-}
-
-/* MOBILE */
 
 @media (max-width: 640px) {
-  .socials-overview {
+  .overview-grid {
     gap: 10px;
   }
 
-  .overview-stat {
-    padding: 18px;
-  }
-
-  .overview-stat strong {
-    font-size: 29px;
-  }
-
-  .platform-groups {
-    gap: 32px;
+  .overview-card {
+    padding: 16px;
   }
 
   .account-grid {
     gap: 14px;
   }
-
-  .account-card {
-    padding: 18px;
-  }
-
-  .platform-heading h2 {
-    font-size: 20px;
-  }
 }
 
-/* ACCESSIBILITY */
-
 @media (prefers-reduced-motion: reduce) {
-  .account-card,
-  .filter-button {
-    transition: none;
-  }
-
   .account-card:hover {
     transform: none;
   }

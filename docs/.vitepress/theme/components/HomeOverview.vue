@@ -1,16 +1,22 @@
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { withBase } from 'vitepress'
 
 import { platforms } from '../../data/platforms'
 import { projects } from '../../data/projects'
 import { socials } from '../../data/socials'
 
-// Ana sayfada gösterilecek maksimum sosyal medya hesabı
+// =====================================
+// SETTINGS
+// =====================================
+
 const maxSocialAccounts = 4
 
-// Otomatik hesaplanan istatistikler
+// =====================================
+// DEVELOPER HUB STATISTICS
+// =====================================
+
 const statistics = computed(() => [
   {
     label: 'Projects',
@@ -32,32 +38,110 @@ const statistics = computed(() => [
   }
 ])
 
-// Ana sayfada gösterilecek sosyal medya hesapları
+// =====================================
+// FEATURED SOCIAL ACCOUNTS
+// =====================================
+
 const featuredSocials = computed(() => {
   return socials.slice(0, maxSocialAccounts)
 })
 
-// Platform simgeleri
+// =====================================
+// PROFILE PICTURES
+// =====================================
+
+// Socials sayfasıyla aynı avatar klasörünü kullan.
+const avatarFiles = import.meta.glob<string>(
+  '../assets/social-avatars/*.{png,jpg,jpeg,webp}',
+  {
+    eager: true,
+    query: '?url',
+    import: 'default'
+  }
+)
+
+// Dosya isimlerini avatar adresleriyle eşleştir.
+const avatarMap: Record<string, string> = {}
+
+for (const [path, url] of Object.entries(avatarFiles)) {
+  const filename = path.split('/').pop() ?? ''
+
+  const key = filename
+    .replace(/\.(png|jpg|jpeg|webp)$/i, '')
+    .toLowerCase()
+
+  avatarMap[key] = url
+}
+
+// Hesap adından dosya anahtarı oluştur.
+function getAvatarKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+// Yüklenemeyen avatarları takip et.
+const failedAvatars = ref<Record<string, boolean>>({})
+
+function getAvatarUrl(name: string): string | undefined {
+  const key = getAvatarKey(name)
+
+  if (failedAvatars.value[key]) {
+    return undefined
+  }
+
+  return avatarMap[key]
+}
+
+function handleAvatarError(name: string) {
+  failedAvatars.value[getAvatarKey(name)] = true
+}
+
+// Profil fotoğrafı yoksa baş harfleri göster.
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+
+  if (words.length === 0) return '?'
+
+  return words
+    .slice(0, 2)
+    .map(word => word[0].toUpperCase())
+    .join('')
+}
+
+// =====================================
+// PLATFORM ICONS
+// =====================================
+
 function getSocialIcon(platform: string): string {
   const icons: Record<string, string> = {
     YouTube: '▶',
-    Kick: '📡',
-    Instagram: '📷',
-    GitHub: '💻',
-    Discord: '💬'
+    Kick: 'K',
+    Instagram: '◎',
+    GitHub: '⌘',
+    Discord: 'D',
+    Twitch: 'T',
+    TikTok: '♪',
+    X: '𝕏'
   }
 
   return icons[platform] ?? '🌐'
 }
 
-// Sosyal medya platformuna göre renk sınıfı
 function getPlatformClass(platform: string): string {
   const classes: Record<string, string> = {
     YouTube: 'youtube',
     Kick: 'kick',
     Instagram: 'instagram',
     GitHub: 'github',
-    Discord: 'discord'
+    Discord: 'discord',
+    Twitch: 'twitch',
+    TikTok: 'tiktok',
+    X: 'twitter'
   }
 
   return classes[platform] ?? 'other'
@@ -67,10 +151,13 @@ function getPlatformClass(platform: string): string {
 <template>
   <div class="home-overview">
 
-    <!-- İSTATİSTİKLER -->
+    <!-- =================================
+         STATISTICS
+         ================================= -->
     <section class="overview-section">
       <div class="section-heading">
         <h2>Developer Hub in Numbers</h2>
+
         <p>
           A quick overview of my projects, platforms and content.
         </p>
@@ -83,13 +170,13 @@ function getPlatformClass(platform: string): string {
           :href="stat.link"
           class="stat-card hub-card hub-card--interactive"
         >
-          <div class="stat-icon" aria-hidden="true">
+          <span class="stat-icon" aria-hidden="true">
             {{ stat.icon }}
-          </div>
-
-          <span class="stat-value">
-            {{ stat.value }}
           </span>
+
+          <strong class="stat-value">
+            {{ stat.value }}
+          </strong>
 
           <span class="stat-label">
             {{ stat.label }}
@@ -98,10 +185,13 @@ function getPlatformClass(platform: string): string {
       </div>
     </section>
 
-    <!-- SOSYAL MEDYA KARTLARI -->
+    <!-- =================================
+         SOCIAL MEDIA
+         ================================= -->
     <section class="overview-section">
       <div class="section-heading">
         <h2>Connect With Me</h2>
+
         <p>
           Find my videos, livestreams and content across platforms.
         </p>
@@ -116,34 +206,58 @@ function getPlatformClass(platform: string): string {
           rel="noopener noreferrer"
           class="social-card hub-card hub-card--interactive"
         >
-          <div
-            class="social-icon"
-            :class="getPlatformClass(account.platform)"
-            aria-hidden="true"
-          >
-            {{ getSocialIcon(account.platform) }}
+          <!-- AVATAR AND PLATFORM -->
+          <div class="social-card-header">
+            <div class="account-avatar">
+              <img
+                v-if="getAvatarUrl(account.name)"
+                :src="getAvatarUrl(account.name)"
+                :alt="`${account.name} profile picture`"
+                loading="lazy"
+                @error="handleAvatarError(account.name)"
+              />
+
+              <span v-else>
+                {{ getInitials(account.name) }}
+              </span>
+            </div>
+
+            <span
+              class="platform-icon"
+              :class="getPlatformClass(account.platform)"
+              :title="account.platform"
+              aria-hidden="true"
+            >
+              {{ getSocialIcon(account.platform) }}
+            </span>
           </div>
 
+          <!-- ACCOUNT INFORMATION -->
           <div class="social-information">
+            <h3>{{ account.name }}</h3>
+
             <span class="social-platform">
               {{ account.platform }}
             </span>
 
-            <h3>{{ account.name }}</h3>
-
             <p>{{ account.description }}</p>
-
-            <span class="social-category">
-              {{ account.category }}
-            </span>
           </div>
 
-          <span class="social-arrow" aria-hidden="true">
-            ↗
+          <!-- CATEGORY -->
+          <span class="social-category">
+            {{ account.category }}
           </span>
+
+          <!-- FOOTER -->
+          <div class="social-card-footer">
+            <span>Visit Channel</span>
+
+            <span aria-hidden="true">↗</span>
+          </div>
         </a>
       </div>
 
+      <!-- ALL SOCIALS -->
       <a
         :href="withBase('/socials/')"
         class="all-socials-link"
@@ -156,6 +270,10 @@ function getPlatformClass(platform: string): string {
 </template>
 
 <style scoped>
+/* =====================================
+   MAIN LAYOUT
+   ===================================== */
+
 .home-overview {
   width: 100%;
   margin: 48px 0;
@@ -178,13 +296,15 @@ function getPlatformClass(platform: string): string {
 }
 
 .section-heading p {
-  margin-top: 8px;
+  margin: 8px 0 0;
   color: var(--vp-c-text-2);
   font-size: 14px;
   line-height: 1.7;
 }
 
-/* İSTATİSTİK KARTLARI */
+/* =====================================
+   STATISTICS
+   ===================================== */
 
 .stats-grid {
   display: grid;
@@ -196,7 +316,10 @@ function getPlatformClass(platform: string): string {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 12px;
+
+  min-width: 0;
   padding: 28px 14px;
 
   border: 1px solid var(--hub-card-border);
@@ -205,9 +328,8 @@ function getPlatformClass(platform: string): string {
   box-shadow: var(--hub-card-shadow);
 
   color: var(--vp-c-text-1);
-  text-decoration: none;
   text-align: center;
-
+  text-decoration: none;
   transition: var(--hub-transition);
 }
 
@@ -222,18 +344,20 @@ function getPlatformClass(platform: string): string {
 }
 
 .stat-value {
+  color: var(--vp-c-brand-1);
   font-size: 36px;
   font-weight: 750;
   line-height: 1;
-  color: var(--vp-c-brand-1);
 }
 
 .stat-label {
-  font-size: 13px;
   color: var(--vp-c-text-2);
+  font-size: 13px;
 }
 
-/* SOSYAL MEDYA KARTLARI */
+/* =====================================
+   SOCIAL GRID
+   ===================================== */
 
 .socials-grid {
   display: grid;
@@ -243,8 +367,10 @@ function getPlatformClass(platform: string): string {
 
 .social-card {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 16px;
+
+  min-width: 0;
   padding: 22px;
 
   border: 1px solid var(--hub-card-border);
@@ -254,7 +380,6 @@ function getPlatformClass(platform: string): string {
 
   color: var(--vp-c-text-1);
   text-decoration: none;
-
   transition: var(--hub-transition);
 }
 
@@ -264,86 +389,190 @@ function getPlatformClass(platform: string): string {
   box-shadow: var(--hub-card-shadow-hover);
 }
 
-.social-icon {
+/* =====================================
+   SOCIAL CARD HEADER
+   ===================================== */
+
+.social-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+
+  border: 3px solid var(--vp-c-divider);
+  border-radius: 50%;
+
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+
+  font-size: 20px;
+  font-weight: 750;
+
+  overflow: hidden;
+}
+
+.account-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.platform-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
 
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
 }
 
+/* =====================================
+   PLATFORM COLORS
+   ===================================== */
+
 .youtube {
-  background: #fee2e2;
-  color: #dc2626;
+  background: #ff0033;
+  color: #fff;
 }
 
 .kick {
-  background: #dcfce7;
-  color: #15803d;
+  background: #53fc18;
+  color: #101010;
 }
 
 .instagram {
-  background: #fce7f3;
-  color: #be185d;
+  background: linear-gradient(
+    135deg,
+    #833ab4,
+    #e1306c,
+    #f77737
+  );
+  color: #fff;
 }
 
-.github,
-.discord,
-.other {
-  background: var(--vp-c-bg);
-  color: var(--vp-c-text-1);
+.github {
+  background: #24292f;
+  color: #fff;
 }
+
+.discord {
+  background: #5865f2;
+  color: #fff;
+}
+
+.twitch {
+  background: #9146ff;
+  color: #fff;
+}
+
+.tiktok,
+.twitter {
+  background: #161616;
+  color: #fff;
+}
+
+.other {
+  background: var(--vp-c-brand-2);
+  color: #fff;
+}
+
+/* =====================================
+   SOCIAL INFORMATION
+   ===================================== */
 
 .social-information {
   flex: 1;
   min-width: 0;
 }
 
-.social-platform {
-  color: var(--vp-c-text-2);
-  font-size: 12px;
-}
-
 .social-information h3 {
-  margin: 5px 0;
-  font-size: 18px;
-  font-weight: 650;
+  margin: 0 0 4px;
+  padding: 0;
+  border: none;
+
+  color: var(--vp-c-text-1);
+  font-size: 20px;
+  font-weight: 700;
+
   overflow-wrap: anywhere;
 }
 
-.social-information p {
-  margin: 8px 0 12px;
-  color: var(--vp-c-text-2);
-  font-size: 13px;
-  line-height: 1.6;
+.social-platform {
+  color: var(--vp-c-text-3);
+  font-size: 12px;
 }
+
+.social-information p {
+  margin: 12px 0 0;
+
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* =====================================
+   CATEGORY AND FOOTER
+   ===================================== */
 
 .social-category {
-  font-size: 12px;
-  color: var(--vp-c-brand-1);
+  align-self: flex-start;
+
+  padding: 6px 10px;
+  border-radius: 999px;
+
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.social-arrow {
+.social-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding-top: 14px;
+  border-top: 1px solid var(--vp-c-divider);
+
   color: var(--vp-c-brand-1);
-  font-size: 20px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .all-socials-link {
   display: inline-block;
-  margin-top: 22px;
+  margin-top: 24px;
+
   color: var(--vp-c-brand-1);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
 }
 
-/* MOBİL UYUMLULUK */
+.all-socials-link:hover {
+  text-decoration: underline;
+}
+
+/* =====================================
+   MOBILE
+   ===================================== */
 
 @media (max-width: 640px) {
   .stats-grid {
@@ -366,12 +595,25 @@ function getPlatformClass(platform: string): string {
     grid-template-columns: 1fr;
   }
 
+  .social-card {
+    padding: 20px;
+  }
+
   .section-heading h2 {
     font-size: 23px;
   }
 }
 
-/* HAREKET HASSASİYETİ */
+/* =====================================
+   ACCESSIBILITY
+   ===================================== */
+
+.stat-card:focus-visible,
+.social-card:focus-visible,
+.all-socials-link:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .stat-card,

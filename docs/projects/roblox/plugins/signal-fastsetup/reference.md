@@ -42,12 +42,7 @@ game
 ## Example Import
 
 ```luau
-local ReplicatedStorage =
-    game:GetService("ReplicatedStorage")
-
-local Signal = require(
-    ReplicatedStorage:WaitForChild("Signal")
-)
+local Signal = require(game.ReplicatedStorage:WaitForChild("Signal"))
 ```
 
 ::: info

@@ -13,7 +13,7 @@ export const socials: SocialAccount[] = [
     name: 'Maskeowl',
     description: 'My YouTube channel',
     url: 'https://www.youtube.com/@Maskeowl',
-    category: 'Main Channels'
+    category: 'Main Channel'
   },
   {
     platform: 'YouTube',
@@ -24,9 +24,9 @@ export const socials: SocialAccount[] = [
   },
   {
     platform: 'Kick',
-    name: 'Ropala',
+    name: 'Ropalwa',
     description: 'My Kick livestream channel',
     url: 'https://kick.com/ropalwa',
-    category: 'Main Channels'
+    category: 'Main Channel'
   }
 ]
