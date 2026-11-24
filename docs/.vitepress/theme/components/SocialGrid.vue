@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { socials } from '../../data/socials.ts'
@@ -66,36 +65,29 @@ const platformConfig: Record<string, {
 }
 
 // =====================================
-// LOCAL PROFILE IMAGES
+// LOCAL AVATARS AND BANNERS
 // =====================================
 
-// Profil fotoğraflarını otomatik bul.
-// Vite görselleri derleme sırasında işler.
+// Avatarlar: social-avatars/
+// Kapaklar: social-covers/ veya social-banners/
+// Vite bu dosyaları otomatik olarak bulur.
 const avatarFiles = import.meta.glob<string>(
   '../assets/social-avatars/*.{png,jpg,jpeg,webp}',
-  {
-    eager: true,
-    query: '?url',
-    import: 'default'
-  }
+  { eager: true, query: '?url', import: 'default' }
 )
 
-// Dosya adlarını hesap adlarıyla eşleştir.
-const avatarMap: Record<string, string> = {}
+const coverFiles = import.meta.glob<string>(
+  '../assets/social-covers/*.{png,jpg,jpeg,webp}',
+  { eager: true, query: '?url', import: 'default' }
+)
 
-for (const [path, url] of Object.entries(avatarFiles)) {
-  const filename = path.split('/').pop() ?? ''
+const bannerFiles = import.meta.glob<string>(
+  '../assets/social-banners/*.{png,jpg,jpeg,webp}',
+  { eager: true, query: '?url', import: 'default' }
+)
 
-  const key = filename
-    .replace(/\.(png|jpg|jpeg|webp)$/i, '')
-    .toLowerCase()
-
-  avatarMap[key] = url
-}
-
-// Hesap adını dosya adına dönüştür.
-function getAvatarKey(name: string): string {
-  return name
+function makeSlug(value: string): string {
+  return value
     .trim()
     .toLowerCase()
     .normalize('NFD')
@@ -104,29 +96,70 @@ function getAvatarKey(name: string): string {
     .replace(/^-|-$/g, '')
 }
 
-// Hatalı fotoğraflar için yedek görünüm
-const failedAvatars = ref<Record<string, boolean>>({})
+function makeImageMap(files: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {}
 
-function getAvatarUrl(name: string): string | undefined {
-  const key = getAvatarKey(name)
-
-  if (failedAvatars.value[key]) {
-    return undefined
+  for (const [path, url] of Object.entries(files)) {
+    const filename = path.split('/').pop() ?? ''
+    const key = makeSlug(filename.replace(/\.(png|jpg|jpeg|webp)$/i, ''))
+    result[key] = url
   }
 
-  return avatarMap[key]
+  return result
 }
 
-function handleAvatarError(name: string) {
-  failedAvatars.value[getAvatarKey(name)] = true
+const avatarMap = makeImageMap(avatarFiles)
+const coverMap = makeImageMap({ ...coverFiles, ...bannerFiles })
+
+// Bozuk bir görsel varsa bir sonraki dosya adı seçeneğini dene.
+const failedImageUrls = ref<Record<string, boolean>>({})
+
+function findImage(
+  imageMap: Record<string, string>,
+  keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const url = imageMap[key]
+    if (url && !failedImageUrls.value[url]) return url
+  }
+  return undefined
+}
+
+function getAvatarUrl(platform: string, name: string): string | undefined {
+  const base = `${makeSlug(platform)}-${makeSlug(name)}`
+  const nameOnly = makeSlug(name)
+
+  return findImage(avatarMap, [
+    `${base}-avatar`,
+    base,
+    `${nameOnly}-avatar`,
+    nameOnly
+  ])
+}
+
+function getCoverUrl(platform: string, name: string): string | undefined {
+  const base = `${makeSlug(platform)}-${makeSlug(name)}`
+
+  return findImage(coverMap, [
+    `${base}-banner`,
+    `${base}-cover`,
+    base
+  ])
+}
+
+function handleAvatarError(platform: string, name: string) {
+  const url = getAvatarUrl(platform, name)
+  if (url) failedImageUrls.value[url] = true
+}
+
+function handleCoverError(platform: string, name: string) {
+  const url = getCoverUrl(platform, name)
+  if (url) failedImageUrls.value[url] = true
 }
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
-
-  if (parts.length === 0) {
-    return '?'
-  }
+  if (parts.length === 0) return '?'
 
   return parts
     .slice(0, 2)
@@ -373,21 +406,33 @@ function resetFilters() {
               :class="getPlatformClass(group.name)"
             >
               <img
-                v-if="getPlatformIcon(group.name)"
-                :src="getPlatformIcon(group.name)"
+                v-if="getCoverUrl(account.platform, account.name)"
+                class="cover-image"
+                :src="getCoverUrl(account.platform, account.name)"
                 alt=""
-                width="36"
-                height="36"
-                @error="handleIconError(group.name)"
+                loading="lazy"
+                @error="handleCoverError(account.platform, account.name)"
               />
 
-              <span v-else class="cover-symbol">
-                {{ getPlatformSymbol(group.name) }}
-              </span>
+              <div class="cover-content">
+                <span class="cover-brand" aria-hidden="true">
+                  <img
+                    v-if="getPlatformIcon(group.name)"
+                    :src="getPlatformIcon(group.name)"
+                    alt=""
+                    width="28"
+                    height="28"
+                    @error="handleIconError(group.name)"
+                  />
+                  <span v-else class="cover-symbol">
+                    {{ getPlatformSymbol(group.name) }}
+                  </span>
+                </span>
 
-              <span class="cover-category">
-                {{ account.category }}
-              </span>
+                <span class="cover-category">
+                  {{ account.category }}
+                </span>
+              </div>
             </div>
 
             <div class="account-body">
@@ -395,11 +440,11 @@ function resetFilters() {
               <!-- REAL AVATAR OR FALLBACK -->
               <div class="account-avatar">
                 <img
-                  v-if="getAvatarUrl(account.name)"
-                  :src="getAvatarUrl(account.name)"
+                  v-if="getAvatarUrl(account.platform, account.name)"
+                  :src="getAvatarUrl(account.platform, account.name)"
                   :alt="`${account.name} profile picture`"
                   loading="lazy"
-                  @error="handleAvatarError(account.name)"
+                  @error="handleAvatarError(account.platform, account.name)"
                 />
 
                 <span v-else>
@@ -586,8 +631,9 @@ function resetFilters() {
 }
 
 .brand-icon img,
-.account-cover > img {
+.cover-brand img {
   display: block;
+  margin: 0;
   object-fit: contain;
 }
 
@@ -672,17 +718,56 @@ function resetFilters() {
   box-shadow: var(--hub-card-shadow-hover);
 }
 
+.account-card:focus-visible,
+.filter-button:focus-visible,
+.reset-button:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
 .account-cover {
+  position: relative;
+  height: 112px;
+  overflow: hidden;
+}
+
+.cover-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+.cover-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  min-height: 96px;
-  padding: 22px;
+  height: 100%;
+  padding: 18px;
+}
+
+.cover-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
 }
 
 .cover-symbol {
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
 }
 
@@ -724,6 +809,7 @@ function resetFilters() {
   display: block;
   width: 100%;
   height: 100%;
+  margin: 0;
   object-fit: cover;
 }
 
