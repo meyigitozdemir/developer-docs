@@ -1,4 +1,3 @@
-
 ---
 title: API Reference
 description: Technical API documentation for Studio Helper.

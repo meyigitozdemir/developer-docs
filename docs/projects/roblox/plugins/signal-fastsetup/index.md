@@ -1,4 +1,3 @@
-
 ---
 title: Signal_FastSetup
 description: Fast Signal module setup for Roblox Studio.

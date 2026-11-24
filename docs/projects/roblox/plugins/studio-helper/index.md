@@ -1,4 +1,3 @@
-
 ---
 title: Studio Helper
 description: Studio Helper demo project documentation

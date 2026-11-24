@@ -1,4 +1,3 @@
-
 ---
 title: Changelog
 description: Signal_FastSetup version history.

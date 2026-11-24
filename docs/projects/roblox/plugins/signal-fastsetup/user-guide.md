@@ -1,4 +1,3 @@
-
 ---
 title: User Guide
 description: How to use Signal_FastSetup.

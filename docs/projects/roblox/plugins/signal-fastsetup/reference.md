@@ -1,4 +1,3 @@
-
 ---
 title: Technical Reference
 description: Technical reference for Signal_FastSetup.

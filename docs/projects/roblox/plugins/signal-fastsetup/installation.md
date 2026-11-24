@@ -1,4 +1,3 @@
-
 ---
 title: Installation
 description: Installation guide for Signal_FastSetup.
